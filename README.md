@@ -1,27 +1,42 @@
-# Reckon
+# Myo
 
-A line based calculator: text on the left, answers on the right. The engine is
-shared between a Mac app and an iOS app, and sheets are plain text so they move
-between the two as ordinary files.
+A line based calculator for macOS and iOS: text on the left, answers on the
+right. One engine, two apps, and sheets that are plain text files — so the same
+sheets open in Numi, sync through whatever drive holds them, and stay readable
+without this app.
 
-Placeholder name, and nothing to do with Numi's code, which is closed source.
-This is written from scratch.
+Nothing here comes from Numi, which is closed source. It is written from
+scratch. `Reckon` is the package name inside; `Myo` is the app.
 
 ## Layout
 
 | Target | What it is |
 | --- | --- |
-| `ReckonCore` | Lexer, parser, evaluator, sheet model. No UI, no platform code. |
-| `ReckonUI` | The SwiftUI sheet editor, shared by both apps. |
-| `ReckonMac` | macOS app. |
+| `ReckonCore` | Lexer, parser, evaluator, sheet model, local cache, folder watcher. No UI, no platform code. |
+| `ReckonUI` | The sheet editor and result column, shared by both apps. |
+| `ReckonMac` | The macOS app: a menu bar item with a panel. |
 | `reckon` | Command line front end, useful for testing and scripting. |
+| `myo/` | The iOS app. An Xcode project that links the same package. |
 
 ```bash
-swift test                       # 18 tests
+swift test                       # 79 tests
 swift build -c release           # builds every target
 .build/release/reckon "120 + 10%"
-.build/release/reckon sheet.txt
+.build/release/reckon sheet.numi
+.build/release/reckon sheet.numi --stats      # how much of it evaluates
+.build/release/reckon sheet.numi --roundtrip  # would saving change a byte?
 ```
+
+The macOS app is assembled by hand from the package rather than by Xcode:
+
+```bash
+swift build -c release --product ReckonMac
+cp .build/release/ReckonMac Myo.app/Contents/MacOS/Myo
+codesign --force --sign - Myo.app
+```
+
+The iOS app is an ordinary Xcode project in `myo/`, and needs a development
+team set on the target to run on a device.
 
 ## What the engine understands
 
@@ -104,8 +119,9 @@ nothing is counted twice, and each currency gets its own line.
 €35      €  35      35€      35eur      35 EUR      100 CHF
 ```
 
-Symbol or ISO code, before or after the amount, attached or spaced. Amounts are
-formatted to the cent, with the sign in front of the symbol (`-€7.00`).
+Symbol or ISO code, before or after the amount, attached or spaced. Cents show
+only when there are cents — `€35`, not `€35.00` — and the sign stays in front of
+the symbol, so a negative total reads `-€7`.
 
 Arithmetic carries the currency: `€10 * 3` is €30, `€120 + 10%` is €132, and a
 plain number takes on the currency beside it, so `€40 + 2` is €42. Dividing two
@@ -118,18 +134,18 @@ refused too. `abs`, `round`, `floor`, `ceil`, `min` and `max` keep the currency.
 
 ## What it does not understand yet
 
-A label after an amount (`35eur oil change`), units, dates, and natural language
-phrasing such as `5% on $30` or `6% off 40 EUR`.
+Units, dates, exchange rates, and natural language phrasing such as `5% on $30`
+or `6% off 40 EUR`. Labels beside an amount *are* handled — see above.
 
 ## Status
 
-- Core compiles and passes its tests on macOS, and typechecks against both the
-  iOS simulator and iOS device SDKs.
-- `ReckonUI` typechecks for iOS.
-- The Mac app builds, launches, and opens a window.
-- There is no Xcode project yet, so there is no iOS `.app` target. SwiftPM
-  cannot produce one. No simulator runtime is installed on this machine either,
-  so the iOS build has been compiled but never run.
+Both apps work. The engine is the tested part: 79 tests covering arithmetic,
+currency, comments, labelled amounts, the document model, the cache and the
+folder watcher.
+
+What is not there yet: no conflict handling anywhere — whoever writes last wins
+— and on iOS no folder watching, so changes made elsewhere arrive when the app
+is brought forward rather than as they happen.
 
 ## Opening a sheet
 
@@ -214,11 +230,40 @@ folder on. A pending edit of your own is written back before the re-read, so
 nothing you typed is lost to it. Nothing watches the folder while the panel is
 shut.
 
+## On the phone
+
+The iOS app is the same sheet and the same engine, forced to dark, with the
+new-sheet and switch-sheet buttons in the navigation bar.
+
+It keeps its own copy of the folder. Sheets in a cloud folder are fetched on
+demand: opening one can be slow, and offline it may not arrive at all — so
+`SheetCache` mirrors them onto the phone. Sheets open from the copy, and edits
+are written to both. A placeholder that has never been downloaded is fetched
+first, because a sheet with no text has no first line to be named after.
+
+Choosing a folder replaces what was there: the list is the folder, not a pile
+of everything ever opened.
+
+**Google Drive and Dropbox do not work here**, and it is not something this app
+can fix. Their File Provider extensions do not offer folder selection, so they
+cannot appear in a folder picker at all. iCloud Drive and On My iPhone do.
+Reaching Drive properly would mean talking to the Drive REST API — OAuth, a
+Google Cloud project, a folder browser of its own.
+
 ## Sync
 
-Sheets are plain UTF-8 text. That is the whole sync design: put them in iCloud
-Drive, Dropbox, or Google Drive and both apps open the same files. Numi's own
-documents are plain text too, so they can be opened directly.
+Sheets are plain UTF-8 text. That is the whole sync design: put them in a folder
+that syncs and both apps open the same files. Numi's own documents are plain
+text too, so they can be opened directly.
+
+Writes to a folder served by a cloud client go through `NSFileCoordinator`.
+That client is another process watching for changes so it can upload them; an
+uncoordinated write can be missed, or can collide with a download landing at
+the same moment.
+
+Nothing merges. **Whoever writes last wins.** Editing the same sheet on two
+devices at once will lose one of the edits, silently. Worth knowing before
+trusting it with anything that matters.
 
 Syncing with Numi's *internal* store is not possible. Its iCloud container is
 bound to its developer's team identifier, which Apple does not let another app
