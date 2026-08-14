@@ -226,6 +226,17 @@ final class PhoneStore: ObservableObject {
 		}
 	}
 
+	/// A new sheet is called Untitled until it says what it is. Only the name
+	/// this app invented is replaced; a sheet you named yourself keeps it.
+	private func renameIfStillUntitled() {
+		guard let name = current, SheetCache.isAutomatic(name),
+			  let wanted = SheetCache.fileName(forTitle: document.name),
+			  cache.rename(name, to: wanted, source: folder)
+		else { return }
+
+		current = wanted
+	}
+
 	func saveNow() {
 		guard let current else { return }
 
@@ -234,6 +245,7 @@ final class PhoneStore: ObservableObject {
 
 		_ = try? cache.write(contents, to: current, source: folder)
 		contentsOnDisk = contents
+		renameIfStillUntitled()
 		sheets = cache.names()
 	}
 }

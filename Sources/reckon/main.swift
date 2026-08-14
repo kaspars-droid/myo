@@ -12,7 +12,8 @@ var arguments = Array(CommandLine.arguments.dropFirst())
 let wantsStats = arguments.contains("--stats")
 let wantsRoundTrip = arguments.contains("--roundtrip")
 let wantsCompare = arguments.contains("--compare")
-arguments.removeAll { $0 == "--stats" || $0 == "--roundtrip" || $0 == "--compare" }
+let wantsName = arguments.contains("--name")
+arguments.removeAll { $0 == "--stats" || $0 == "--roundtrip" || $0 == "--compare" || $0 == "--name" }
 
 let sheet = Sheet(locale: Locale(identifier: "en_US_POSIX"))
 
@@ -78,6 +79,12 @@ if wantsCompare {
 	}
 
 	print("answers \(agreed + differed + missing + unreadable)  agreed \(agreed)  differed \(differed)  noResult \(missing)  unreadable \(unreadable)")
+	exit(0)
+}
+
+// What this sheet is called in the list: its first line.
+if wantsName {
+	print(SheetDocument(text: source).name)
 	exit(0)
 }
 

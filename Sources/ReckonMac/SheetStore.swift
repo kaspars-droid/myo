@@ -106,6 +106,20 @@ final class SheetStore: ObservableObject {
 	func load(_ target: URL) {
 		leaveCurrentSheet(goingTo: target)
 
+		// Opening a sheet from somewhere else means you are working there now.
+		// This happens before the sheet is loaded: changing folder discards an
+		// empty sheet, and doing that halfway through a load would throw away
+		// the very sheet being opened.
+		//
+		// Compared by standardised path, because appending and then removing a
+		// path component leaves a trailing slash — so the same folder compares
+		// unequal to itself, and a new sheet was discarded the moment it was
+		// made.
+		let parent = target.deletingLastPathComponent()
+		if folder?.standardizedFileURL.path != parent.standardizedFileURL.path {
+			setFolder(parent, openFirst: false)
+		}
+
 		let text = (try? String(contentsOf: target, encoding: .utf8))
 			?? (try? String(contentsOf: target, encoding: .isoLatin1))
 			?? ""
@@ -114,10 +128,6 @@ final class SheetStore: ObservableObject {
 		document = SheetDocument(text: text)
 		url = target
 		UserDefaults.standard.set(target.path, forKey: Self.lastSheetKey)
-
-		// Opening a sheet from somewhere else means you are working there now.
-		let parent = target.deletingLastPathComponent()
-		if folder != parent { setFolder(parent, openFirst: false) }
 
 		refreshEntries()
 		watcher.watch(folder: folder, file: url)
@@ -180,10 +190,31 @@ final class SheetStore: ObservableObject {
 		do {
 			try contents.write(to: url, atomically: true, encoding: .utf8)
 			contentsOnDisk = contents
+			renameIfStillUntitled()
 			refreshEntries()   // the first line, and so the name, may have changed
 		} catch {
 			NSSound.beep()
 		}
+	}
+
+	/// A new sheet is called Untitled until it says what it is.
+	///
+	/// Only the name this app invented is replaced. A sheet you named yourself
+	/// keeps that name however its first line changes, because renaming
+	/// someone's file out from under them is not a thing to do twice.
+	private func renameIfStillUntitled() {
+		guard let current = url, SheetCache.isAutomatic(current.lastPathComponent),
+			  let wanted = SheetCache.fileName(forTitle: document.name)
+		else { return }
+
+		let target = current.deletingLastPathComponent().appendingPathComponent(wanted)
+		guard !FileManager.default.fileExists(atPath: target.path),
+			  (try? FileManager.default.moveItem(at: current, to: target)) != nil
+		else { return }
+
+		url = target
+		UserDefaults.standard.set(target.path, forKey: Self.lastSheetKey)
+		watcher.watch(folder: folder, file: target)
 	}
 
 	// MARK: - The folder

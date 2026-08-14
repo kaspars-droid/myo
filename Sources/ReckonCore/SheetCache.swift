@@ -156,6 +156,57 @@ public struct SheetCache: Sendable {
 		return wrote && failure == nil
 	}
 
+	/// The auto-given names, the ones worth replacing once a sheet says what
+	/// it is: `Untitled.numi`, `Untitled 2.numi`, and so on.
+	public static func isAutomatic(_ fileName: String) -> Bool {
+		let stem = (fileName as NSString).deletingPathExtension
+		guard stem == "Untitled" || stem.hasPrefix("Untitled ") else { return false }
+		guard stem != "Untitled" else { return true }
+
+		let suffix = stem.dropFirst("Untitled ".count)
+		return !suffix.isEmpty && suffix.allSatisfy(\.isNumber)
+	}
+
+	/// Turns a sheet's first line into something a file system will accept.
+	///
+	/// Returns nil when there is nothing usable left, which is the signal to
+	/// keep whatever the file is already called rather than invent something.
+	public static func fileName(forTitle title: String) -> String? {
+		let forbidden = CharacterSet(charactersIn: "/\\:*?\"<>|").union(.controlCharacters)
+
+		let cleaned = title
+			.components(separatedBy: forbidden).joined(separator: " ")
+			.replacingOccurrences(of: "  ", with: " ")
+			.trimmingCharacters(in: .whitespacesAndNewlines)
+			.prefix(60)
+			.trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+
+		guard !cleaned.isEmpty, cleaned != "Untitled" else { return nil }
+		return "\(cleaned).\(Self.fileExtension)"
+	}
+
+	/// Renames a sheet, in the cache and wherever it came from.
+	@discardableResult
+	public func rename(_ name: String, to newName: String, source: URL?) -> Bool {
+		guard name != newName else { return false }
+
+		let manager = FileManager.default
+		guard !manager.fileExists(atPath: url(for: newName).path) else { return false }
+		guard (try? manager.moveItem(at: url(for: name), to: url(for: newName))) != nil else {
+			return false
+		}
+
+		if let source {
+			let from = source.appendingPathComponent(name)
+			let to = source.appendingPathComponent(newName)
+			if manager.fileExists(atPath: from.path), !manager.fileExists(atPath: to.path) {
+				try? manager.moveItem(at: from, to: to)
+			}
+		}
+
+		return true
+	}
+
 	/// A name no sheet in the folder is using yet.
 	public func unusedName(startingFrom stem: String) -> String {
 		var candidate = "\(stem).\(Self.fileExtension)"

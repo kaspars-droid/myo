@@ -813,3 +813,74 @@ final class FolderWatcherTests: XCTestCase {
 		watcher.stop()
 	}
 }
+
+final class SheetFileNameTests: XCTestCase {
+
+	func testKnowsAnAutomaticName() {
+		XCTAssertTrue(SheetCache.isAutomatic("Untitled.numi"))
+		XCTAssertTrue(SheetCache.isAutomatic("Untitled 2.numi"))
+		XCTAssertTrue(SheetCache.isAutomatic("Untitled 17.numi"))
+
+		XCTAssertFalse(SheetCache.isAutomatic("volvo.numi"))
+		XCTAssertFalse(SheetCache.isAutomatic("Untitled thoughts.numi"))
+		XCTAssertFalse(SheetCache.isAutomatic("2022_v2.numi"))
+	}
+
+	func testTurnsATitleIntoAFileName() {
+		XCTAssertEqual(SheetCache.fileName(forTitle: "volvo remonts"), "volvo remonts.numi")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "rēķini 2022"), "rēķini 2022.numi")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "Q1 invoices"), "Q1 invoices.numi")
+	}
+
+	/// A first line is prose, and prose contains characters a file system will
+	/// not take.
+	func testStripsWhatAFileSystemWillNotTake() {
+		XCTAssertEqual(SheetCache.fileName(forTitle: "income/outgoings"), "income outgoings.numi")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "budget: 2024"), "budget 2024.numi")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "  spaced  "), "spaced.numi")
+		XCTAssertNil(SheetCache.fileName(forTitle: "..."))
+		XCTAssertNil(SheetCache.fileName(forTitle: "   "))
+		XCTAssertNil(SheetCache.fileName(forTitle: "Untitled"))
+	}
+
+	func testKeepsFileNamesToASensibleLength() {
+		let long = String(repeating: "a", count: 200)
+		let made = SheetCache.fileName(forTitle: long)
+		XCTAssertNotNil(made)
+		XCTAssertLessThanOrEqual(made!.count, 66)
+	}
+
+	func testRenamesInBothPlaces() throws {
+		let root = URL(fileURLWithPath: NSTemporaryDirectory())
+			.appendingPathComponent("rename-\(UUID().uuidString)")
+		let source = root.appendingPathComponent("cloud")
+		try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+
+		let cache = SheetCache(folder: root.appendingPathComponent("local"))
+		try cache.makeFolder()
+		_ = try cache.write("volvo remonts\n35eur", to: "Untitled.numi", source: source)
+
+		XCTAssertTrue(cache.rename("Untitled.numi", to: "volvo remonts.numi", source: source))
+		XCTAssertEqual(cache.names(), ["volvo remonts.numi"])
+		XCTAssertTrue(FileManager.default.fileExists(
+			atPath: source.appendingPathComponent("volvo remonts.numi").path))
+
+		try? FileManager.default.removeItem(at: root)
+	}
+
+	/// Renaming onto a sheet that already exists would destroy it.
+	func testWillNotRenameOverAnExistingSheet() throws {
+		let root = URL(fileURLWithPath: NSTemporaryDirectory())
+			.appendingPathComponent("rename-\(UUID().uuidString)")
+		let cache = SheetCache(folder: root)
+		try cache.makeFolder()
+
+		_ = try cache.write("one", to: "Untitled.numi", source: nil)
+		_ = try cache.write("two", to: "taken.numi", source: nil)
+
+		XCTAssertFalse(cache.rename("Untitled.numi", to: "taken.numi", source: nil))
+		XCTAssertEqual(cache.read("taken.numi"), "two")
+
+		try? FileManager.default.removeItem(at: root)
+	}
+}
