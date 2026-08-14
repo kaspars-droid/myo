@@ -27,13 +27,16 @@ swift build -c release           # builds every target
 .build/release/reckon sheet.numi --roundtrip  # would saving change a byte?
 ```
 
-The macOS app is assembled by hand from the package rather than by Xcode:
+SwiftPM builds an executable, not an app bundle, so the macOS app is assembled
+by a script rather than by Xcode:
 
 ```bash
-swift build -c release --product ReckonMac
-cp .build/release/ReckonMac Myo.app/Contents/MacOS/Myo
-codesign --force --sign - Myo.app
+Scripts/build-mac-app.sh          # produces Myo.app
+open Myo.app
 ```
+
+It signs ad hoc, which is enough to run on the machine that built it and not
+enough to hand to anyone else.
 
 The iOS app is an ordinary Xcode project in `myo/`, and needs a development
 team set on the target to run on a device.
