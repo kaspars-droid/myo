@@ -1,0 +1,20 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Built products. Myo.app here is assembled by hand from .build, so it is
+# output rather than source.
+Myo.app/
+DerivedData/
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# macOS
+.DS_Store
+
+# Xcode's own build output for the iOS app
+myo/**/xcuserdata/
