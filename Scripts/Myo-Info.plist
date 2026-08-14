@@ -4,7 +4,9 @@
 <dict>
 	<key>CFBundleName</key><string>Myo</string>
 	<key>CFBundleDisplayName</key><string>Myo</string>
-	<key>CFBundleIdentifier</key><string>myo.myo</string>
+	<!-- The identifier registered to the team, and the same one the phone app
+	     uses, so the two are one app rather than two that share a name. -->
+	<key>CFBundleIdentifier</key><string>lv.cirsis.myo</string>
 	<key>CFBundleExecutable</key><string>Myo</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>

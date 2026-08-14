@@ -36,10 +36,38 @@ open Myo.app
 ```
 
 It signs ad hoc, which is enough to run on the machine that built it and not
-enough to hand to anyone else.
+enough to hand to anyone else. Handing it to someone else is a second script:
 
-The iOS app is an ordinary Xcode project in `myo/`, and needs a development
-team set on the target to run on a device.
+```bash
+Scripts/release-mac.sh              # re-signs with Developer ID
+Scripts/release-mac.sh --notarize   # and sends it to Apple, and staples
+```
+
+Developer ID is what lets another machine open the app at all; notarising is
+what stops Gatekeeper warning about it first, and stapling writes the ticket
+into the bundle so it opens on a machine that cannot reach Apple to ask. It
+leaves `Myo.zip`, which is the thing to send.
+
+The iOS app is an ordinary Xcode project in `myo/`:
+
+```bash
+Scripts/build-ios.sh              # archive and export build/myo.ipa
+Scripts/build-ios.sh --upload     # and send it to App Store Connect
+```
+
+Both take the same App Store Connect API key, passed as `ASC_KEY_ID` and
+`ASC_ISSUER_ID`, with the key itself at
+`~/.appstoreconnect/private_keys/AuthKey_<key id>.p8`. Uploading also needs an
+app record already created there for the bundle identifier; it does not make
+one. The build number comes from the commit count, because App Store Connect
+refuses a number it has seen before.
+
+The app icon is drawn rather than painted, by the same numbers as the mark in
+the menu bar:
+
+```bash
+swift Scripts/make-icon.swift     # writes the 1024px icon into the catalogue
+```
 
 ## What the engine understands
 

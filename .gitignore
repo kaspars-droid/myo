@@ -6,7 +6,11 @@ Package.resolved
 # Built products. Myo.app here is assembled by hand from .build, so it is
 # output rather than source.
 Myo.app/
+Myo.zip
 DerivedData/
+
+# The iOS archive and the IPA the release script exports.
+build/
 
 # Xcode
 *.xcuserstate
