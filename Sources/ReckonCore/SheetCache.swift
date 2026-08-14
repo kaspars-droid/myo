@@ -14,13 +14,19 @@ public struct SheetCache: Sendable {
 
 	private var manager: FileManager { .default }
 
-	public static let fileExtension = "numi"
+	/// Myo's own, rather than borrowed from the app whose format this once
+	/// followed. A folder can hold both, and only these are Myo's sheets.
+	///
+	/// `myo` alone belongs to an accounting package, which is near enough to
+	/// what this does to end up on the same machine, so the app's full name
+	/// is used instead.
+	public static let fileExtension = "myocalc"
 
 	public init(folder: URL) {
 		self.folder = folder
 	}
 
-	/// What a sheet is called on disk, e.g. `volvo.numi`.
+	/// What a sheet is called on disk, e.g. `volvo.myo`.
 	public func url(for name: String) -> URL {
 		folder.appendingPathComponent(name)
 	}
@@ -157,7 +163,7 @@ public struct SheetCache: Sendable {
 	}
 
 	/// The auto-given names, the ones worth replacing once a sheet says what
-	/// it is: `Untitled.numi`, `Untitled 2.numi`, and so on.
+	/// it is: `Untitled.myocalc`, `Untitled 2.myocalc`, and so on.
 	public static func isAutomatic(_ fileName: String) -> Bool {
 		let stem = (fileName as NSString).deletingPathExtension
 		guard stem == "Untitled" || stem.hasPrefix("Untitled ") else { return false }

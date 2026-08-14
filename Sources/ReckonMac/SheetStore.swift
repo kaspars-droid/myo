@@ -40,8 +40,10 @@ final class SheetStore: ObservableObject {
 
 	private static let lastSheetKey = "lastSheet"
 	private static let folderKey = "sheetFolder"
-	/// Sheets are `.numi` files. Nothing else is listed.
-	static let fileExtension = "numi"
+	/// Sheets are `.myocalc` files. Nothing else is listed. The engine already
+	/// says which extension that is, and two answers to one question is one
+	/// too many.
+	static var fileExtension: String { SheetCache.fileExtension }
 
 	init() {
 		watcher.onChange = { [weak self] in self?.reloadFromDisk() }
@@ -286,10 +288,11 @@ final class SheetStore: ObservableObject {
 			return
 		}
 
-		var candidate = folder.appendingPathComponent("Untitled.numi")
+		var candidate = folder.appendingPathComponent("Untitled.\(Self.fileExtension)")
 		var counter = 2
 		while FileManager.default.fileExists(atPath: candidate.path) {
-			candidate = folder.appendingPathComponent("Untitled \(counter).numi")
+			candidate = folder.appendingPathComponent(
+				"Untitled \(counter).\(Self.fileExtension)")
 			counter += 1
 		}
 

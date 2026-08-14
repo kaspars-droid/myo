@@ -16,17 +16,21 @@
 	<!-- Lives in the menu bar, so no Dock icon and no application menu. -->
 	<key>LSUIElement</key><true/>
 
-	<key>UTImportedTypeDeclarations</key>
+	<!-- Exported rather than imported: this is Myo's own document type now,
+	     not another app's format being read. A sheet is still plain UTF-8
+	     text, which is what it conforms to, so anything that opens text can
+	     open one. -->
+	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key><string>com.dmitrynikolaev.numi</string>
-			<key>UTTypeDescription</key><string>Numi Sheet</string>
+			<key>UTTypeIdentifier</key><string>lv.cirsis.myo.sheet</string>
+			<key>UTTypeDescription</key><string>Myo Sheet</string>
 			<key>UTTypeConformsTo</key>
-			<array><string>public.plain-text</string></array>
+			<array><string>public.utf8-plain-text</string></array>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
-				<array><string>numi</string></array>
+				<array><string>myocalc</string></array>
 			</dict>
 		</dict>
 	</array>
@@ -34,11 +38,12 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleTypeName</key><string>Numi Sheet</string>
+			<key>CFBundleTypeName</key><string>Myo Sheet</string>
 			<key>CFBundleTypeRole</key><string>Editor</string>
-			<key>LSHandlerRank</key><string>Alternate</string>
+			<!-- Owner, because these are Myo's files and no one else's. -->
+			<key>LSHandlerRank</key><string>Owner</string>
 			<key>LSItemContentTypes</key>
-			<array><string>com.dmitrynikolaev.numi</string></array>
+			<array><string>lv.cirsis.myo.sheet</string></array>
 		</dict>
 	</array>
 </dict>

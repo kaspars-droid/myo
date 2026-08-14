@@ -1,12 +1,13 @@
 # Myo
 
 A line based calculator for macOS and iOS: text on the left, answers on the
-right. One engine, two apps, and sheets that are plain text files — so the same
-sheets open in Numi, sync through whatever drive holds them, and stay readable
+right. One engine, two apps, and sheets that are plain text files — so they
+sync through whatever drive holds them, open in any editor, and stay readable
 without this app.
 
-Nothing here comes from Numi, which is closed source. It is written from
-scratch. `Reckon` is the package name inside; `Myo` is the app.
+`Reckon` is the package name inside; `Myo` is the app. A sheet is a `.myocalc`
+file, Myo's own: `.myo` alone belongs to an accounting package, close enough to
+what this does to end up on the same machine.
 
 ## Layout
 
@@ -19,12 +20,12 @@ scratch. `Reckon` is the package name inside; `Myo` is the app.
 | `myo/` | The iOS app. An Xcode project that links the same package. |
 
 ```bash
-swift test                       # 79 tests
+swift test                       # 87 tests
 swift build -c release           # builds every target
 .build/release/reckon "120 + 10%"
-.build/release/reckon sheet.numi
-.build/release/reckon sheet.numi --stats      # how much of it evaluates
-.build/release/reckon sheet.numi --roundtrip  # would saving change a byte?
+.build/release/reckon sheet.myocalc
+.build/release/reckon sheet.myocalc --stats      # how much of it evaluates
+.build/release/reckon sheet.myocalc --roundtrip  # would saving change a byte?
 ```
 
 SwiftPM builds an executable, not an app bundle, so the macOS app is assembled
@@ -108,7 +109,7 @@ A line can say what its figure is for, on either side of it:
 35eur oil change
 oil change 35eur
 10 + 5 apples
-35eur oil change = € 35     a result Numi left in the file is ignored
+35eur oil change = € 35     an answer already in the file is ignored
 ```
 
 Only whole words are stepped over. A line with more arithmetic in it than the
@@ -134,9 +135,9 @@ logical line sits and hands those positions back, and each result is placed
 against its own line. A line that wraps over several rows keeps its answer
 level with where the line starts.
 
-Numi's answers are re-attached to whatever lines still read the same after an
-edit. Without that, one keystroke would strip the answers off every other line
-and rewrite the whole file.
+Answers already in the file are re-attached to whatever lines still read the
+same after an edit. Without that, one keystroke would strip them off every
+other line and rewrite the whole file.
 
 ## The bar along the bottom
 
@@ -170,7 +171,7 @@ or `6% off 40 EUR`. Labels beside an amount *are* handled — see above.
 
 ## Status
 
-Both apps work. The engine is the tested part: 79 tests covering arithmetic,
+Both apps work. The engine is the tested part: 87 tests covering arithmetic,
 currency, comments, labelled amounts, the document model, the cache and the
 folder watcher.
 
@@ -180,27 +181,27 @@ is brought forward rather than as they happen.
 
 ## Opening a sheet
 
-Myo reads `.numi` files. Only `.numi` files appear in the sheet list, so a
-folder can hold notes and other text without them showing up as sheets.
+Myo reads `.myocalc` files. Only those appear in the sheet list, so a folder
+can hold notes and other text without them showing up as sheets.
 
-### Numi's answers
+### An answer written into the file
 
-Numi writes its answer onto the end of each line, joined by a `=` padded with
-non-breaking spaces rather than ordinary ones. That padding is what makes the
-answer safe to detect: an `=` typed by hand declares a variable and has plain
-spaces around it, so the two can never be confused. In the author's own sheets
-all 140 of the `=` signs are Numi's, not one is typed.
+Some calculators write their answer onto the end of each line, joined by a `=`
+padded with non-breaking spaces rather than ordinary ones. That padding is what
+makes such an answer safe to detect: an `=` typed by hand declares a variable
+and has plain spaces around it, so the two can never be confused.
 
-So the answer is taken off the line and held to one side. The line you edit is
-just what you wrote, the result column shows this engine's own answer, and the
-stored one goes back to the file untouched. Editing a line drops its stored
-answer, because an answer to text that has since changed is a lie.
+Where one is found, it is taken off the line and held to one side. The line you
+edit is just what you wrote, the result column shows this engine's own answer,
+and the stored one goes back to the file untouched. Editing a line drops its
+stored answer, because an answer to text that has since changed is a lie.
 
-Reading keeps every byte. That is checked against every sheet in the author's own Numi
-folder:
+Reading keeps every byte, which is what makes that safe. The command line
+front end takes a path rather than an extension, so any text file can be put
+through it to check:
 
 ```bash
-reckon your-sheet.numi --roundtrip    # prints "identical" or "CHANGED"
+reckon your-sheet.myocalc --roundtrip    # prints "identical" or "CHANGED"
 ```
 
 ## In the menu bar
@@ -227,10 +228,10 @@ open the list of sheets to switch between. Both swap the sheet **in the window
 you are in**; the app is one window, not one window per file.
 
 A sheet is a file, and the library is a folder you pick: **Select Folder…**,
-in the same menu or with `cmd O`. Every `.numi` file in that folder joins the
-list, and nothing else does.
+in the same menu or with `cmd O`. Every `.myocalc` file in that folder joins
+the list, and nothing else does.
 Nothing is imported, indexed or copied into an app container, so the folder
-keeps working in Numi and keeps syncing through whatever drive it is on.
+keeps syncing through whatever drive it is on.
 
 Opening a sheet from somewhere else, by double clicking it in the Finder,
 moves the library to that sheet's folder, on the grounds that this is clearly
@@ -241,7 +242,7 @@ In the list a sheet is called by its **first line**, not its file name, with any
 `#` taken off the front: a sheet starting `# Q1 invoices` is listed as
 "Q1 invoices". The file on disk is never renamed.
 
-`+` writes a new `Untitled.numi` into that folder, and it is called Untitled
+`+` writes a new `Untitled.myocalc` into that folder, and it is called Untitled
 until its first line says otherwise. With no folder chosen yet it asks for one
 first.
 
@@ -284,8 +285,7 @@ Google Cloud project, a folder browser of its own.
 ## Sync
 
 Sheets are plain UTF-8 text. That is the whole sync design: put them in a folder
-that syncs and both apps open the same files. Numi's own documents are plain
-text too, so they can be opened directly.
+that syncs and both apps open the same files.
 
 Writes to a folder served by a cloud client go through `NSFileCoordinator`.
 That client is another process watching for changes so it can upload them; an
@@ -296,6 +296,3 @@ Nothing merges. **Whoever writes last wins.** Editing the same sheet on two
 devices at once will lose one of the edits, silently. Worth knowing before
 trusting it with anything that matters.
 
-Syncing with Numi's *internal* store is not possible. Its iCloud container is
-bound to its developer's team identifier, which Apple does not let another app
-read.

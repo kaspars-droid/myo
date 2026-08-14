@@ -618,96 +618,115 @@ final class SheetCacheTests: XCTestCase {
 	}
 
 	func testBringsSheetsDownFromTheCloudFolder() throws {
-		try putInSource("volvo.numi", "35eur oil")
-		try putInSource("q1.numi", "# Q1")
+		try putInSource("volvo.myocalc", "35eur oil")
+		try putInSource("q1.myocalc", "# Q1")
 
 		let copied = try cache.refresh(from: source)
 
-		XCTAssertEqual(copied.sorted(), ["q1.numi", "volvo.numi"])
-		XCTAssertEqual(cache.names(), ["q1.numi", "volvo.numi"])
-		XCTAssertEqual(cache.read("volvo.numi"), "35eur oil")
+		XCTAssertEqual(copied.sorted(), ["q1.myocalc", "volvo.myocalc"])
+		XCTAssertEqual(cache.names(), ["q1.myocalc", "volvo.myocalc"])
+		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
 	}
 
 	/// Only sheets are sheets.
 	func testIgnoresEverythingThatIsNotASheet() throws {
 		try putInSource("notes.txt", "not a sheet")
-		try putInSource("real.numi", "10")
+		try putInSource("real.myocalc", "10")
 
 		try cache.refresh(from: source)
-		XCTAssertEqual(cache.names(), ["real.numi"])
+		XCTAssertEqual(cache.names(), ["real.myocalc"])
+	}
+
+	/// A sheet is a `.myocalc` file. The extension is Myo's own rather than
+	/// borrowed, so what the app writes is plainly its own document. `.myo`
+	/// alone belongs to an accounting package, which is close enough to what
+	/// this does to end up on the same machine.
+	func testASheetIsAMyoCalcFile() {
+		XCTAssertEqual(SheetCache.fileExtension, "myocalc")
+	}
+
+	/// Numi's files are not read. Myo used to take its extension, which made
+	/// every Numi sheet in a folder look like one of Myo's own; it does not
+	/// any more, and a folder holding both shows only Myo's.
+	func testDoesNotClaimNumisSheets() throws {
+		try putInSource("borrowed.numi", "10")
+		try putInSource("mine.myocalc", "20")
+
+		try cache.refresh(from: source)
+		XCTAssertEqual(cache.names(), ["mine.myocalc"])
 	}
 
 	func testSecondRefreshBringsNothingDownAgain() throws {
-		try putInSource("a.numi", "10", ageInSeconds: 60)
+		try putInSource("a.myocalc", "10", ageInSeconds: 60)
 		try cache.refresh(from: source)
 
 		XCTAssertEqual(try cache.refresh(from: source), [])
 	}
 
 	func testABetterCopyInTheCloudWins() throws {
-		try putInSource("a.numi", "old", ageInSeconds: 60)
+		try putInSource("a.myocalc", "old", ageInSeconds: 60)
 		try cache.refresh(from: source)
 
-		try putInSource("a.numi", "edited elsewhere")   // now, so newer
-		XCTAssertEqual(try cache.refresh(from: source), ["a.numi"])
-		XCTAssertEqual(cache.read("a.numi"), "edited elsewhere")
+		try putInSource("a.myocalc", "edited elsewhere")   // now, so newer
+		XCTAssertEqual(try cache.refresh(from: source), ["a.myocalc"])
+		XCTAssertEqual(cache.read("a.myocalc"), "edited elsewhere")
 	}
 
 	/// An edit made here and not yet written back must not be overwritten by
 	/// the older copy it came from.
 	func testAnUnsentEditIsNotClobbered() throws {
-		try putInSource("a.numi", "from the cloud", ageInSeconds: 600)
+		try putInSource("a.myocalc", "from the cloud", ageInSeconds: 600)
 		try cache.refresh(from: source)
 
-		try cache.write("edited on the phone", to: "a.numi", source: nil)   // offline
+		try cache.write("edited on the phone", to: "a.myocalc", source: nil)   // offline
 
 		XCTAssertEqual(try cache.refresh(from: source), [])
-		XCTAssertEqual(cache.read("a.numi"), "edited on the phone")
+		XCTAssertEqual(cache.read("a.myocalc"), "edited on the phone")
 	}
 
 	func testWritingGoesToBothCopies() throws {
-		try putInSource("a.numi", "before")
+		try putInSource("a.myocalc", "before")
 		try cache.refresh(from: source)
 
-		let reachedSource = try cache.write("after", to: "a.numi", source: source)
+		let reachedSource = try cache.write("after", to: "a.myocalc", source: source)
 
 		XCTAssertTrue(reachedSource)
-		XCTAssertEqual(cache.read("a.numi"), "after")
-		XCTAssertEqual(try String(contentsOf: source.appendingPathComponent("a.numi"), encoding: .utf8),
+		XCTAssertEqual(cache.read("a.myocalc"), "after")
+		XCTAssertEqual(try String(contentsOf: source.appendingPathComponent("a.myocalc"), encoding: .utf8),
 					   "after")
 	}
 
 	/// Offline, the sheet still has to be safe on the device.
 	func testWritingSurvivesAnUnreachableSource() throws {
 		let gone = root.appendingPathComponent("unplugged")
-		let reachedSource = try cache.write("kept", to: "a.numi", source: gone)
+		let reachedSource = try cache.write("kept", to: "a.myocalc", source: gone)
 
 		XCTAssertFalse(reachedSource)
-		XCTAssertEqual(cache.read("a.numi"), "kept")
+		XCTAssertEqual(cache.read("a.myocalc"), "kept")
 	}
 
 	func testFindsAnUnusedName() throws {
-		XCTAssertEqual(cache.unusedName(startingFrom: "Untitled"), "Untitled.numi")
+		XCTAssertEqual(cache.unusedName(startingFrom: "Untitled"), "Untitled.myocalc")
 
-		try cache.write("", to: "Untitled.numi", source: nil)
-		XCTAssertEqual(cache.unusedName(startingFrom: "Untitled"), "Untitled 2.numi")
+		try cache.write("", to: "Untitled.myocalc", source: nil)
+		XCTAssertEqual(cache.unusedName(startingFrom: "Untitled"), "Untitled 2.myocalc")
 
-		try cache.write("", to: "Untitled 2.numi", source: nil)
-		XCTAssertEqual(cache.unusedName(startingFrom: "Untitled"), "Untitled 3.numi")
+		try cache.write("", to: "Untitled 2.myocalc", source: nil)
+		XCTAssertEqual(cache.unusedName(startingFrom: "Untitled"), "Untitled 3.myocalc")
 	}
 
 	func testRemovingTakesBothCopies() throws {
-		try putInSource("a.numi", "x")
+		try putInSource("a.myocalc", "x")
 		try cache.refresh(from: source)
 
-		cache.remove("a.numi", source: source)
+		cache.remove("a.myocalc", source: source)
 
 		XCTAssertEqual(cache.names(), [])
-		XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("a.numi").path))
+		XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("a.myocalc").path))
 	}
 
 	func testEmptyingForgetsTheFolder() throws {
-		try putInSource("a.numi", "x")
+		try putInSource("a.myocalc", "x")
 		try cache.refresh(from: source)
 
 		cache.empty()
@@ -749,19 +768,19 @@ final class FolderWatcherTests: XCTestCase {
 		await settle(0.4)
 
 		fired = 0
-		write("5\n", "arrived.numi")
+		write("5\n", "arrived.myocalc")
 		await settle()
 
 		XCTAssertGreaterThan(fired, 0)
 	}
 
 	func testNoticesTheOpenSheetBeingChanged() async {
-		write("10\n", "open.numi")
-		watcher.watch(folder: root, file: root.appendingPathComponent("open.numi"))
+		write("10\n", "open.myocalc")
+		watcher.watch(folder: root, file: root.appendingPathComponent("open.myocalc"))
 		await settle(0.4)
 
 		fired = 0
-		write("10\n20\n", "open.numi")
+		write("10\n20\n", "open.myocalc")
 		await settle()
 
 		XCTAssertGreaterThan(fired, 0)
@@ -773,7 +792,7 @@ final class FolderWatcherTests: XCTestCase {
 		await settle(0.4)
 
 		fired = 0
-		for index in 0..<6 { write("\(index)", "burst\(index).numi") }
+		for index in 0..<6 { write("\(index)", "burst\(index).myocalc") }
 		await settle()
 
 		XCTAssertEqual(fired, 1)
@@ -785,7 +804,7 @@ final class FolderWatcherTests: XCTestCase {
 		watcher.stop()
 
 		fired = 0
-		write("1", "after.numi")
+		write("1", "after.myocalc")
 		await settle()
 
 		XCTAssertEqual(fired, 0)
@@ -801,7 +820,7 @@ final class FolderWatcherTests: XCTestCase {
 		}
 
 		fired = 0
-		write("1", "still-working.numi")
+		write("1", "still-working.myocalc")
 		await settle()
 
 		XCTAssertGreaterThan(fired, 0, "watcher stopped working after being re-armed")
@@ -817,37 +836,41 @@ final class FolderWatcherTests: XCTestCase {
 final class SheetFileNameTests: XCTestCase {
 
 	func testKnowsAnAutomaticName() {
-		XCTAssertTrue(SheetCache.isAutomatic("Untitled.numi"))
-		XCTAssertTrue(SheetCache.isAutomatic("Untitled 2.numi"))
-		XCTAssertTrue(SheetCache.isAutomatic("Untitled 17.numi"))
+		XCTAssertTrue(SheetCache.isAutomatic("Untitled.myocalc"))
+		XCTAssertTrue(SheetCache.isAutomatic("Untitled 2.myocalc"))
+		XCTAssertTrue(SheetCache.isAutomatic("Untitled 17.myocalc"))
 
-		XCTAssertFalse(SheetCache.isAutomatic("volvo.numi"))
-		XCTAssertFalse(SheetCache.isAutomatic("Untitled thoughts.numi"))
-		XCTAssertFalse(SheetCache.isAutomatic("2022_v2.numi"))
+		XCTAssertFalse(SheetCache.isAutomatic("volvo.myocalc"))
+		XCTAssertFalse(SheetCache.isAutomatic("Untitled thoughts.myocalc"))
+		XCTAssertFalse(SheetCache.isAutomatic("2022_v2.myocalc"))
 	}
 
 	func testTurnsATitleIntoAFileName() {
-		XCTAssertEqual(SheetCache.fileName(forTitle: "volvo remonts"), "volvo remonts.numi")
-		XCTAssertEqual(SheetCache.fileName(forTitle: "rēķini 2022"), "rēķini 2022.numi")
-		XCTAssertEqual(SheetCache.fileName(forTitle: "Q1 invoices"), "Q1 invoices.numi")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "volvo remonts"), "volvo remonts.myocalc")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "rēķini 2022"), "rēķini 2022.myocalc")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "Q1 invoices"), "Q1 invoices.myocalc")
 	}
 
 	/// A first line is prose, and prose contains characters a file system will
 	/// not take.
 	func testStripsWhatAFileSystemWillNotTake() {
-		XCTAssertEqual(SheetCache.fileName(forTitle: "income/outgoings"), "income outgoings.numi")
-		XCTAssertEqual(SheetCache.fileName(forTitle: "budget: 2024"), "budget 2024.numi")
-		XCTAssertEqual(SheetCache.fileName(forTitle: "  spaced  "), "spaced.numi")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "income/outgoings"), "income outgoings.myocalc")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "budget: 2024"), "budget 2024.myocalc")
+		XCTAssertEqual(SheetCache.fileName(forTitle: "  spaced  "), "spaced.myocalc")
 		XCTAssertNil(SheetCache.fileName(forTitle: "..."))
 		XCTAssertNil(SheetCache.fileName(forTitle: "   "))
 		XCTAssertNil(SheetCache.fileName(forTitle: "Untitled"))
 	}
 
+	/// The title is what gets cut, to 60 characters; the extension is then put
+	/// back on whole. Working the bound out from the extension rather than
+	/// writing the total down means changing the extension cannot quietly
+	/// break this.
 	func testKeepsFileNamesToASensibleLength() {
 		let long = String(repeating: "a", count: 200)
 		let made = SheetCache.fileName(forTitle: long)
 		XCTAssertNotNil(made)
-		XCTAssertLessThanOrEqual(made!.count, 66)
+		XCTAssertLessThanOrEqual(made!.count, 60 + 1 + SheetCache.fileExtension.count)
 	}
 
 	func testRenamesInBothPlaces() throws {
@@ -858,12 +881,12 @@ final class SheetFileNameTests: XCTestCase {
 
 		let cache = SheetCache(folder: root.appendingPathComponent("local"))
 		try cache.makeFolder()
-		_ = try cache.write("volvo remonts\n35eur", to: "Untitled.numi", source: source)
+		_ = try cache.write("volvo remonts\n35eur", to: "Untitled.myocalc", source: source)
 
-		XCTAssertTrue(cache.rename("Untitled.numi", to: "volvo remonts.numi", source: source))
-		XCTAssertEqual(cache.names(), ["volvo remonts.numi"])
+		XCTAssertTrue(cache.rename("Untitled.myocalc", to: "volvo remonts.myocalc", source: source))
+		XCTAssertEqual(cache.names(), ["volvo remonts.myocalc"])
 		XCTAssertTrue(FileManager.default.fileExists(
-			atPath: source.appendingPathComponent("volvo remonts.numi").path))
+			atPath: source.appendingPathComponent("volvo remonts.myocalc").path))
 
 		try? FileManager.default.removeItem(at: root)
 	}
@@ -875,11 +898,11 @@ final class SheetFileNameTests: XCTestCase {
 		let cache = SheetCache(folder: root)
 		try cache.makeFolder()
 
-		_ = try cache.write("one", to: "Untitled.numi", source: nil)
-		_ = try cache.write("two", to: "taken.numi", source: nil)
+		_ = try cache.write("one", to: "Untitled.myocalc", source: nil)
+		_ = try cache.write("two", to: "taken.myocalc", source: nil)
 
-		XCTAssertFalse(cache.rename("Untitled.numi", to: "taken.numi", source: nil))
-		XCTAssertEqual(cache.read("taken.numi"), "two")
+		XCTAssertFalse(cache.rename("Untitled.myocalc", to: "taken.myocalc", source: nil))
+		XCTAssertEqual(cache.read("taken.myocalc"), "two")
 
 		try? FileManager.default.removeItem(at: root)
 	}

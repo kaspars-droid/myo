@@ -2,7 +2,9 @@ import Foundation
 import ReckonCore
 
 // reckon "2+2"          evaluate one expression
-// reckon file.numi      evaluate a sheet
+// reckon sheet.myocalc  evaluate a sheet. Any text file will do: the reader
+//                       takes a path, not an extension, so a sheet Numi wrote
+//                       can still be checked with --stats or --roundtrip.
 // cat sheet | reckon    evaluate a sheet from stdin
 //
 // --stats prints a summary instead of the sheet, which is handy for checking
