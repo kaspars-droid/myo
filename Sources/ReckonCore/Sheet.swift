@@ -116,7 +116,10 @@ public struct Sheet: Sendable {
 			return record(comment == nil ? .blank : .comment, value: nil)
 		}
 
-		guard let tokens = Lexer.tokenize(trimmed), !tokens.isEmpty else {
+		// Read numbers the way this sheet writes them, so an answer in the
+		// results column can be typed straight back into a line.
+		guard let tokens = Lexer.tokenize(trimmed, commaIsDecimal: locale.decimalSeparator == ","),
+			  !tokens.isEmpty else {
 			return record(.prose, value: nil)
 		}
 

@@ -58,12 +58,24 @@ struct Parser {
 	private var trailingIsALabel: Bool {
 		guard index < tokens.count else { return true }
 
-		let rest = tokens[index...]
-		let label = rest.prefix { $0 != .equals }
+		let label = tokens[index...].prefix { $0 != .equals }
 
-		return label.allSatisfy { token in
-			if case .word = token { return true }
-			return false
+		// What a description must not do is swallow arithmetic. `5 boxes * 3`
+		// is a sum with a word in the middle, and answering 5 to it would drop
+		// the rest without saying so.
+		//
+		// Everything else is prose and belongs to the label: commas between
+		// items, a slash between two words, a size written into the name. A
+		// real sheet is full of all three — `200 plaster, buckets, cable`,
+		// `35 cassettes/box`, `7 mortar 10kg` — and requiring plain words
+		// alone left a folder of them with an empty result column.
+		guard let firstOperator = label.firstIndex(where: {
+			if case .op = $0 { return true } else { return false }
+		}) else { return true }
+
+		let afterOperator = label[label.index(after: firstOperator)...]
+		return !afterOperator.contains { token in
+			if case .number = token { return true } else { return false }
 		}
 	}
 
@@ -97,28 +109,68 @@ struct Parser {
 		return symbol
 	}
 
+	/// An operator with words in front of it, as in `302 boards + 6 trailer`.
+	///
+	/// The word names the amount before it and does not end the sum. At least
+	/// one word must be stepped over, so this is only ever a second attempt
+	/// after a plain match has failed, and the caller rewinds if the right
+	/// hand side then turns out not to be an amount.
+	private mutating func match(opPastWords symbols: Set<String>) -> String? {
+		var lookahead = index
+		while case .word? = tokenAt(lookahead) { lookahead += 1 }
+
+		guard lookahead > index,
+			  case .op(let symbol)? = tokenAt(lookahead),
+			  symbols.contains(symbol) else { return nil }
+
+		index = lookahead + 1
+		return symbol
+	}
+
 	// expression := term (('+' | '-') term)*
 	mutating func parseExpression() -> Expr? {
 		guard var left = parseTerm() else { return nil }
 
-		while let symbol = match(op: ["+", "-"]) {
-			guard let right = parseTerm() else { return nil }
-			left = .binary(symbol, left, right)
-		}
+		while true {
+			if let symbol = match(op: ["+", "-"]) {
+				guard let right = parseTerm() else { return nil }
+				left = .binary(symbol, left, right)
+				continue
+			}
 
-		return left
+			// Only worth reading past words if a real amount follows, so
+			// `35 cassettes/box` keeps its slash as part of the description.
+			let checkpoint = index
+			if let symbol = match(opPastWords: ["+", "-"]), let right = parseTerm() {
+				left = .binary(symbol, left, right)
+				continue
+			}
+
+			index = checkpoint
+			return left
+		}
 	}
 
 	// term := power (('*' | '/') power)*
 	private mutating func parseTerm() -> Expr? {
 		guard var left = parsePower() else { return nil }
 
-		while let symbol = match(op: ["*", "/"]) {
-			guard let right = parsePower() else { return nil }
-			left = .binary(symbol, left, right)
-		}
+		while true {
+			if let symbol = match(op: ["*", "/"]) {
+				guard let right = parsePower() else { return nil }
+				left = .binary(symbol, left, right)
+				continue
+			}
 
-		return left
+			let checkpoint = index
+			if let symbol = match(opPastWords: ["*", "/"]), let right = parsePower() {
+				left = .binary(symbol, left, right)
+				continue
+			}
+
+			index = checkpoint
+			return left
+		}
 	}
 
 	// power := unary ('^' power)?      right associative

@@ -17,7 +17,15 @@ let wantsCompare = arguments.contains("--compare")
 let wantsName = arguments.contains("--name")
 arguments.removeAll { $0 == "--stats" || $0 == "--roundtrip" || $0 == "--compare" || $0 == "--name" }
 
-let sheet = Sheet(locale: Locale(identifier: "en_US_POSIX"))
+// The app reads a sheet in the reader's own locale, which decides whether
+// `527,4` is a decimal. POSIX is the default here so output stays diffable.
+var locale = Locale(identifier: "en_US_POSIX")
+if let flag = arguments.firstIndex(of: "--locale"), flag + 1 < arguments.count {
+	locale = Locale(identifier: arguments[flag + 1])
+	arguments.removeSubrange(flag...(flag + 1))
+}
+
+let sheet = Sheet(locale: locale)
 
 let source: String
 if let first = arguments.first, FileManager.default.fileExists(atPath: first) {
@@ -46,17 +54,17 @@ if wantsCompare {
 	var agreed = 0, differed = 0, missing = 0, unreadable = 0
 
 	// Compare the value, not the spacing: Numi writes "€ 35" where this
-	// writes "€35.00", and those are the same number.
-	func mineNumber(_ text: String) -> Double? {
-		Double(text.filter { $0.isNumber || $0 == "-" || $0 == "." })
+	// writes "€35.00", and those are the same number. Currency symbols and
+	// thousands separators go; whichever character is the decimal point stays.
+	func number(_ text: String, decimal: Character) -> Double? {
+		let kept = text.filter { $0.isNumber || $0 == "-" || $0 == decimal }
+		return Double(String(kept.map { $0 == decimal ? "." : $0 }))
 	}
 
-	// Numi writes this machine's locale: comma for the decimal, space for
-	// the thousands.
-	func numiNumber(_ text: String) -> Double? {
-		let kept = text.filter { $0.isNumber || $0 == "-" || $0 == "," }
-		return Double(kept.replacingOccurrences(of: ",", with: "."))
-	}
+	// Numi writes this machine's locale, and so does the sheet when asked to.
+	let mineDecimal: Character = locale.decimalSeparator == "," ? "," : "."
+	func mineNumber(_ text: String) -> Double? { number(text, decimal: mineDecimal) }
+	func numiNumber(_ text: String) -> Double? { number(text, decimal: ",") }
 
 	for (index, answer) in document.storedAnswers.enumerated() {
 		guard let answer else { continue }

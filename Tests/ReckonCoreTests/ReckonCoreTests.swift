@@ -203,6 +203,100 @@ final class SheetTests: XCTestCase {
 	}
 }
 
+/// A handwritten expense sheet is mostly amounts with a description beside
+/// them, and the descriptions are messy. These are the shapes that a real
+/// folder of sheets turned out to be full of.
+final class DescribedAmountTests: XCTestCase {
+	private let sheet = Sheet()
+	private let latvian = Sheet(locale: Locale(identifier: "lv_LV"))
+
+	func testCommasSlashesAndSizesBelongToTheDescription() {
+		let lines = sheet.evaluate("""
+		200 plaster, buckets, cable
+		35 fuses/box
+		7 mortar 10kg
+		46 white paint 10l, roller, sheeting
+		""")
+
+		XCTAssertEqual(lines.map(\.formatted), ["200", "35", "7", "46"])
+	}
+
+	func testAFullStopInAWordDoesNotThrowTheLineAway() {
+		// `38 self-lev. kitchen`: an abbreviation used to take the whole line
+		// down with it, because a stray full stop stopped the lexer.
+		let lines = sheet.evaluate("38 self lev. kitchen")
+
+		XCTAssertEqual(lines[0].formatted, "38")
+	}
+
+	func testAWordBetweenTwoAmountsDoesNotEndTheSum() {
+		let lines = sheet.evaluate("""
+		302 boards+6 trailer
+		5 boxes * 3
+		100 rent - 50 refund
+		""")
+
+		XCTAssertEqual(lines.map(\.formatted), ["308", "15", "50"])
+	}
+
+	func testASlashBetweenWordsIsStillNotDivision() {
+		// The rewind: `/` is found by looking past words, then the right hand
+		// side turns out to be a word too, so the line keeps its description.
+		let lines = sheet.evaluate("""
+		35 fuses/box
+		66 brake/clutch fluid change
+		""")
+
+		XCTAssertEqual(lines.map(\.formatted), ["35", "66"])
+	}
+
+	func testAnAmountFollowedByPunctuationStillCounts() {
+		let lines = sheet.evaluate("18, lime, corners")
+
+		XCTAssertEqual(lines[0].formatted, "18")
+	}
+
+	func testArithmeticHidingBehindADescriptionIsNotSwallowed() {
+		// Nothing here parses as a sum, and answering with the first number
+		// would drop the rest of the line without saying so.
+		let lines = sheet.evaluate("10 boxes, 3 bags")
+
+		XCTAssertEqual(lines[0].formatted, "10")
+		XCTAssertEqual(lines[0].text, "10 boxes, 3 bags")
+	}
+
+	func testDecimalCommaWhereThatIsHowNumbersAreWritten() {
+		let lines = latvian.evaluate("527,4+30,25 osb, plywood, isover")
+
+		XCTAssertEqual(lines[0].formatted, "557,65")
+	}
+
+	func testTheAnswerCanBeTypedBackIn() {
+		// The results column prints `557,65`, so a line must be able to read
+		// it. This is the whole reason the decimal comma is locale bound.
+		let printed = latvian.evaluate("527,4 + 30,25")[0].formatted
+		let again = latvian.evaluate("\(printed ?? "") + 0")[0].formatted
+
+		XCTAssertEqual(again, printed)
+	}
+
+	func testACommaIsStillAnArgumentSeparatorWhereItIsNotADecimal() {
+		XCTAssertEqual(sheet.evaluate("min(1, 2)")[0].formatted, "1")
+	}
+
+	func testSemicolonSeparatesArgumentsWhereACommaCannot() {
+		XCTAssertEqual(latvian.evaluate("min(1; 2)")[0].formatted, "1")
+		XCTAssertEqual(sheet.evaluate("min(1; 2)")[0].formatted, "1")
+	}
+
+	func testATitleIsStillProse() {
+		let lines = sheet.evaluate("flat renovation")
+
+		XCTAssertEqual(lines[0].kind, .prose)
+		XCTAssertNil(lines[0].value)
+	}
+}
+
 final class CurrencyTests: XCTestCase {
 	private let sheet = Sheet()
 

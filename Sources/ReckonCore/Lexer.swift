@@ -18,13 +18,28 @@ enum Token: Equatable {
 struct Lexer {
 	private let scalars: [Character]
 	private var index = 0
+	private let commaIsDecimal: Bool
 
-	init(_ text: String) {
+	init(_ text: String, commaIsDecimal: Bool) {
 		scalars = Array(text)
+		self.commaIsDecimal = commaIsDecimal
 	}
 
-	static func tokenize(_ text: String) -> [Token]? {
-		var lexer = Lexer(text)
+	/// Whether `527,4` means five hundred and twenty seven and four tenths.
+	///
+	/// It does wherever the reader writes numbers that way. The results column
+	/// already prints `557,65` in those places, and a sheet that cannot read
+	/// back the answer it just wrote is broken.
+	///
+	/// The cost is that a comma can no longer separate two arguments there, so
+	/// `min(1;2)` takes a semicolon instead — the same trade every spreadsheet
+	/// makes for the same reason.
+	///
+	/// A `Sheet` passes the locale it formats results with, so the two always
+	/// agree; the default is only for callers that tokenize a line on its own.
+	static func tokenize(_ text: String,
+						 commaIsDecimal: Bool = Locale.current.decimalSeparator == ",") -> [Token]? {
+		var lexer = Lexer(text, commaIsDecimal: commaIsDecimal)
 		return lexer.run()
 	}
 
@@ -39,7 +54,7 @@ struct Lexer {
 				continue
 			}
 
-			if character.isNumber || (character == "." && peekIsNumber(at: index + 1)) {
+			if character.isNumber || (isDecimalPoint(character) && peekIsNumber(at: index + 1)) {
 				guard let number = readNumber() else { return nil }
 				tokens.append(.number(number))
 				continue
@@ -73,16 +88,27 @@ struct Lexer {
 				tokens.append(.leftParen)
 			case ")":
 				tokens.append(.rightParen)
-			case ",":
+			case ",", ";":
+				// A comma this far has digits on only one side, so it is
+				// punctuation between items rather than part of a number.
 				tokens.append(.comma)
 			case "=":
 				tokens.append(.equals)
+			case ".":
+				// A full stop that is not a decimal point is prose: an
+				// abbreviation, or the end of a sentence. Rejecting the whole
+				// line over it left `38 pašizlīdzin. virtuvē` with no answer.
+				tokens.append(.word("."))
 			default:
 				return nil  // not arithmetic, so the line is prose
 			}
 		}
 
 		return tokens
+	}
+
+	private func isDecimalPoint(_ character: Character) -> Bool {
+		character == "." || (commaIsDecimal && character == ",")
 	}
 
 	private func peekIsNumber(at position: Int) -> Bool {
@@ -98,9 +124,9 @@ struct Lexer {
 			if character.isNumber {
 				text.append(character)
 				index += 1
-			} else if character == "." && !seenSeparator && peekIsNumber(at: index + 1) {
+			} else if isDecimalPoint(character) && !seenSeparator && peekIsNumber(at: index + 1) {
 				seenSeparator = true
-				text.append(character)
+				text.append(".")
 				index += 1
 			} else {
 				break
