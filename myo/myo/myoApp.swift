@@ -99,7 +99,7 @@ final class PhoneStore: ObservableObject {
 	private static let bookmarkKey = "folderBookmark"
 
 	var title: String {
-		guard let current else { return "Myo" }
+		guard let current else { return "Myo Calc" }
 		return displayName(of: current)
 	}
 
@@ -125,7 +125,7 @@ final class PhoneStore: ObservableObject {
 		} else {
 			// Backed by a file from the start: an unsaved sheet on screen is
 			// a sheet waiting to be lost.
-			let name = cache.unusedName(startingFrom: "Myo")
+			let name = cache.unusedName(startingFrom: "Myo Calc")
 			_ = try? cache.write(SheetView.sample, to: name, source: folder)
 			sheets = cache.names()
 			load(name)

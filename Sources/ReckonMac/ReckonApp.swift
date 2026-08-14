@@ -10,7 +10,7 @@ struct MyoApp: App {
 	@NSApplicationDelegateAdaptor(MenuBarController.self) private var menuBar
 
 	var body: some Scene {
-		Window("Myo", id: MyoApp.windowID) {
+		Window("Myo Calc", id: MyoApp.windowID) {
 			SheetView(document: $store.document)
 				.frame(minWidth: 460, minHeight: 340)
 				.background(CentredTitle())
@@ -48,7 +48,7 @@ struct MyoApp: App {
 	}
 
 	static var title: some View {
-		Text("Myo").font(.headline).foregroundStyle(Palette.label)
+		Text("Myo Calc").font(.headline).foregroundStyle(Palette.label)
 	}
 }
 
@@ -94,9 +94,10 @@ private struct SheetControls: View {
 		Button {
 			store.newSheet()
 		} label: {
-			Image(systemName: "plus")
+			Image(systemName: "plus").font(Palette.controlFont)
 		}
 		.buttonStyle(.plain)
+		.foregroundStyle(Palette.label)
 		.help("New sheet")
 
 		// A menu rather than a popover: it is what the system uses for a list
@@ -129,12 +130,18 @@ private struct SheetControls: View {
 			}
 
 			Divider()
-			Button("Quit Myo") { NSApplication.shared.terminate(nil) }
+			Toggle("Start at Login", isOn: Binding(
+				get: { LoginItem.isEnabled },
+				set: { LoginItem.setEnabled($0) }))
+
+			Divider()
+			Button("Quit Myo Calc") { NSApplication.shared.terminate(nil) }
 				.keyboardShortcut("q")
 		} label: {
-			Image(systemName: "line.3.horizontal")
+			Image(systemName: "line.3.horizontal").font(Palette.controlFont)
 		}
 		.buttonStyle(.plain)
+		.foregroundStyle(Palette.label)
 		.help("Switch sheet")
 	}
 }

@@ -3,10 +3,10 @@
 .swiftpm/
 Package.resolved
 
-# Built products. Myo.app here is assembled by hand from .build, so it is
+# Built products. Myo Calc.app here is assembled by hand from .build, so it is
 # output rather than source.
-Myo.app/
-Myo.zip
+Myo Calc.app/
+Myo Calc.zip
 DerivedData/
 
 # The iOS archive and the IPA the release script exports.

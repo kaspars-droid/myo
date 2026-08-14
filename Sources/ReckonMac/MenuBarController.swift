@@ -97,7 +97,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 	/// item is made to show one without losing the left click behaviour.
 	private func showMenu() {
 		let menu = NSMenu()
-		menu.addItem(withTitle: "Quit Myo", action: #selector(quit), keyEquivalent: "q")
+		menu.addItem(withTitle: "Quit Myo Calc", action: #selector(quit), keyEquivalent: "q")
 			.target = self
 
 		statusItem?.menu = menu

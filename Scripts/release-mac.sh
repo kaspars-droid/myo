@@ -23,8 +23,8 @@ cd "$root"
 
 TEAM_ID="BFE454ZWZZ"
 SIGN_ID="Developer ID Application: Arturs Cirsis ($TEAM_ID)"
-APP="$root/Myo.app"
-ZIP="$root/Myo.zip"
+APP="$root/Myo Calc.app"
+ZIP="$root/Myo Calc.zip"
 
 NOTARIZE=0
 [ "${1:-}" = "--notarize" ] && NOTARIZE=1

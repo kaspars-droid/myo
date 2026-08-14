@@ -108,4 +108,8 @@ public enum Palette {
 	/// Dark gray, for the app's own furniture: its name, and the total of the
 	/// result column. Both are labels on the sheet rather than part of it.
 	public static let label = Color(white: 0.40)
+
+	/// The controls in the panel: a size up from body, so two small glyphs are
+	/// comfortable to hit, and the same gray as the rest of the furniture.
+	public static let controlFont = Font.system(size: 15, weight: .medium)
 }

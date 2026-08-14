@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key><string>Myo</string>
-	<key>CFBundleDisplayName</key><string>Myo</string>
+	<key>CFBundleName</key><string>Myo Calc</string>
+	<key>CFBundleDisplayName</key><string>Myo Calc</string>
 	<!-- The identifier registered to the team, and the same one the phone app
 	     uses, so the two are one app rather than two that share a name. -->
 	<key>CFBundleIdentifier</key><string>lv.cirsis.myo</string>
-	<key>CFBundleExecutable</key><string>Myo</string>
+	<key>CFBundleExecutable</key><string>Myo Calc</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>
 	<key>CFBundleVersion</key><string>1.0</string>
@@ -20,11 +20,14 @@
 	     not another app's format being read. A sheet is still plain UTF-8
 	     text, which is what it conforms to, so anything that opens text can
 	     open one. -->
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key><string>lv.cirsis.myo.sheet</string>
-			<key>UTTypeDescription</key><string>Myo Sheet</string>
+			<key>UTTypeDescription</key><string>Myo Calc Sheet</string>
+			<key>UTTypeIconFile</key><string>Document</string>
 			<key>UTTypeConformsTo</key>
 			<array><string>public.utf8-plain-text</string></array>
 			<key>UTTypeTagSpecification</key>
@@ -38,7 +41,8 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleTypeName</key><string>Myo Sheet</string>
+			<key>CFBundleTypeName</key><string>Myo Calc Sheet</string>
+			<key>CFBundleTypeIconFile</key><string>Document</string>
 			<key>CFBundleTypeRole</key><string>Editor</string>
 			<!-- Owner, because these are Myo's files and no one else's. -->
 			<key>LSHandlerRank</key><string>Owner</string>
