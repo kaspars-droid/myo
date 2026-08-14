@@ -34,11 +34,17 @@ mkdir -p "$OUT"
 # it only ever goes up, and it says which commit a build came from.
 BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 
-echo "==> Archiving $SCHEME  (build $BUILD)"
+# The version comes from the tag, as it does for the Mac app, so the two
+# cannot disagree about what release this is. Left to the project file it
+# would be a third number to remember to raise.
+VERSION="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo 1.0)"
+
+echo "==> Archiving $SCHEME  ($VERSION, build $BUILD)"
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" \
 	-destination 'generic/platform=iOS' \
 	-archivePath "$OUT/myo.xcarchive" \
 	-allowProvisioningUpdates \
+	MARKETING_VERSION="$VERSION" \
 	CURRENT_PROJECT_VERSION="$BUILD" \
 	archive
 

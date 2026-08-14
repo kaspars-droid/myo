@@ -60,8 +60,9 @@ Both take the same App Store Connect API key, passed as `ASC_KEY_ID` and
 `ASC_ISSUER_ID`, with the key itself at
 `~/.appstoreconnect/private_keys/AuthKey_<key id>.p8`. Uploading also needs an
 app record already created there for the bundle identifier; it does not make
-one. The build number comes from the commit count, because App Store Connect
-refuses a number it has seen before.
+one. Both take their version from the latest tag and their build number from
+the commit count, so a release cannot end up calling itself two different
+things, and App Store Connect never sees a build number twice.
 
 The app icon is drawn rather than painted, by the same numbers as the mark in
 the menu bar:
