@@ -149,12 +149,19 @@ public struct Sheet: Sendable {
 		}
 	}
 
+	/// How a figure is shown. Two decimals, because `613,33-25%` is 459,9975
+	/// and nobody wants to read that down a column.
+	///
+	/// This is the display only. The arithmetic keeps every digit, so a total
+	/// adds the exact figures and is rounded once, at the end, rather than
+	/// adding up a column of already rounded ones.
 	public func format(_ value: Quantity) -> String {
 		let formatter = NumberFormatter()
 		formatter.locale = locale
 		formatter.numberStyle = .decimal
 		formatter.usesGroupingSeparator = true
-		formatter.maximumFractionDigits = 10
+		formatter.roundingMode = .halfUp
+		formatter.maximumFractionDigits = 2
 		formatter.minimumFractionDigits = 0
 
 		guard let code = value.currency else {

@@ -293,7 +293,7 @@ final class DescribedAmountTests: XCTestCase {
 	/// word left the `,33` to start a number of its own, and the line came
 	/// out as 0.2475 instead of 460.
 	func testAWordEndsWhereTheNumberBegins() {
-		XCTAssertEqual(sheet.evaluate("pa strau malt613.33-25%")[0].formatted, "459.9975")
+		XCTAssertEqual(sheet.evaluate("pa strau malt613.33-25%")[0].formatted, "460")
 		XCTAssertEqual(sheet.evaluate("7 mortar 10kg")[0].formatted, "7")
 		XCTAssertEqual(sheet.evaluate("35eur oil change")[0].formatted, "€35")
 	}
@@ -631,6 +631,30 @@ final class GrandTotalTests: XCTestCase {
 		""")
 
 		XCTAssertEqual(lines[3].formatted, "96")
+	}
+
+	/// Two decimals is the display. The arithmetic keeps every digit, so the
+	/// bar adds the exact figures and rounds once at the end rather than
+	/// adding up a column of numbers that have each already been rounded.
+	func testTheTotalAddsTheExactFiguresNotTheRoundedOnes() {
+		let lines = Sheet().evaluate("""
+		0.004
+		0.004
+		0.004
+		""")
+
+		XCTAssertEqual(lines.map(\.formatted), ["0", "0", "0"])
+		XCTAssertEqual(totals("""
+		0.004
+		0.004
+		0.004
+		"""), ["0.01"])
+	}
+
+	func testALongAnswerIsShownToTwoDecimals() {
+		XCTAssertEqual(Sheet().evaluate("613.33-25%")[0].formatted, "460")
+		XCTAssertEqual(Sheet().evaluate("1850 / 0.79")[0].formatted, "2,341.77")
+		XCTAssertEqual(Sheet().evaluate("2.675")[0].formatted, "2.68")
 	}
 
 	func testEmptySheetHasNoTotal() {
