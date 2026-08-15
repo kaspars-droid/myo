@@ -11,6 +11,7 @@ import AppKit
 final class MenuBarController: NSObject, NSApplicationDelegate {
 	private var statusItem: NSStatusItem?
 	private let popover = NSPopover()
+	private var outsideClick: Any?
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -24,6 +25,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 
 		popover.behavior = .transient
 		popover.animates = false
+		popover.delegate = self
 		popover.contentSize = NSSize(width: 460, height: 460)
 		popover.contentViewController = NSHostingController(
 			rootView: MenuBarPanel(store: SheetStore.shared))
@@ -90,7 +92,34 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 			SheetStore.shared.reloadFromDisk()
 			popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
 			popover.contentViewController?.view.window?.makeKey()
+			watchForClicksElsewhere()
 		}
+	}
+
+	/// A transient popover closes itself when you click away from it — until a
+	/// menu has been opened inside it. The menu runs an event loop of its own,
+	/// and the popover's watch for those clicks does not survive it, so the
+	/// panel then sits over everything until the icon is clicked again.
+	///
+	/// This is that watch, kept by hand. A global monitor sees only the clicks
+	/// that land in other applications, which is exactly the case the popover
+	/// stops noticing; clicks inside this app are still its own business.
+	private func watchForClicksElsewhere() {
+		stopWatchingForClicksElsewhere()
+
+		outsideClick = NSEvent.addGlobalMonitorForEvents(
+			matching: [.leftMouseDown, .rightMouseDown]
+		) { [weak self] _ in
+			// Global monitors are delivered on the main thread, but a wrong
+			// guess about that is a crash rather than a mistake, so this hops
+			// rather than asserts.
+			Task { @MainActor in self?.popover.performClose(nil) }
+		}
+	}
+
+	private func stopWatchingForClicksElsewhere() {
+		if let outsideClick { NSEvent.removeMonitor(outsideClick) }
+		outsideClick = nil
 	}
 
 	/// Right click. Attaching the menu and clicking the button is how a status
@@ -108,5 +137,13 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 	@objc private func quit() {
 		SheetStore.shared.settleNow()
 		NSApp.terminate(nil)
+	}
+}
+
+extension MenuBarController: NSPopoverDelegate {
+	/// However the panel closed — clicked away from, or by the icon — the
+	/// watch goes with it.
+	func popoverDidClose(_ notification: Notification) {
+		stopWatchingForClicksElsewhere()
 	}
 }
