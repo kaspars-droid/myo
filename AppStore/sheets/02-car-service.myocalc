@@ -1,0 +1,12 @@
+# Volvo, 90 000 km
+
+215 timing belt
+84 oil, filter
+139 front pads/discs
+46 wipers, bulbs
+28 cabin filter
+62 coolant, brake fluid
+310 labour 4h
+95 diagnostics
+sum          # the bill
+sum * 0.21   # of which VAT

@@ -1,0 +1,11 @@
+# Floor to lay, m2
+
+4.2 * 3.8    # living room
+3.1 * 2.6    # kitchen
+2.4 * 1.9    # bathroom
+5.0 * 3.4    # bedroom
+1.8 * 1.2    # hall
+2.9 * 2.2    # study
+1.4 * 3.6    # landing
+sum          # to cover
+sum + 10%    # with offcuts

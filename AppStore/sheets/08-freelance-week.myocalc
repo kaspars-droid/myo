@@ -1,0 +1,10 @@
+# Freelance week
+
+14 h * 65    # Monday, Tuesday
+9 h * 80     # Wednesday
+6 h * 65     # Thursday
+11 h * 95    # Friday, the rush job
+4 h * 65     # Saturday morning
+sum          # billed
+sum * 0.75   # after tax
+sum / 44     # per hour, all in
