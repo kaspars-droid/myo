@@ -26,7 +26,7 @@ struct MyoApp: App {
 				if phase == .active {
 					store.refresh()
 				} else {
-					store.saveNow()
+					store.settleNow()
 				}
 			}
 			.fileImporter(isPresented: $store.isChoosingFolder,
@@ -94,7 +94,11 @@ final class PhoneStore: ObservableObject {
 
 	private let cache = SheetCache(folder: URL.documentsDirectory.appendingPathComponent("Sheets"))
 	private var saveWork: Task<Void, Never>?
+	private var renameWork: Task<Void, Never>?
 	private var contentsOnDisk = ""
+	/// The first line the file is named for. A rename follows a change to it,
+	/// not a difference from it, so a sheet named by hand keeps that name.
+	private var titleOnDisk = ""
 
 	private static let bookmarkKey = "folderBookmark"
 
@@ -149,7 +153,7 @@ final class PhoneStore: ObservableObject {
 	// MARK: - The folder
 
 	func choose(_ picked: URL) {
-		saveNow()
+		settleNow()
 		folder?.stopAccessingSecurityScopedResource()
 
 		guard picked.startAccessingSecurityScopedResource() else { return }
@@ -192,22 +196,24 @@ final class PhoneStore: ObservableObject {
 		if let current, let text = cache.read(current), text != contentsOnDisk {
 			contentsOnDisk = text
 			document = SheetDocument(text: text)
+			titleOnDisk = document.name
 		}
 	}
 
 	// MARK: - Sheets
 
 	func load(_ name: String) {
-		saveNow()
+		settleNow()
 
 		let text = cache.read(name) ?? ""
 		contentsOnDisk = text
 		document = SheetDocument(text: text)
+		titleOnDisk = document.name
 		current = name
 	}
 
 	func newSheet() {
-		saveNow()
+		settleNow()
 
 		let name = cache.unusedName(startingFrom: "Untitled")
 		_ = try? cache.write("", to: name, source: folder)
@@ -224,17 +230,46 @@ final class PhoneStore: ObservableObject {
 			guard !Task.isCancelled else { return }
 			self?.saveNow()
 		}
+
+		scheduleRename()
 	}
 
-	/// A new sheet is called Untitled until it says what it is. Only the name
-	/// this app invented is replaced; a sheet you named yourself keeps it.
-	private func renameIfStillUntitled() {
-		guard let name = current, SheetCache.isAutomatic(name),
-			  let wanted = SheetCache.fileName(forTitle: document.name),
-			  cache.rename(name, to: wanted, source: folder)
+	/// Renaming waits much longer than saving, and for a plain reason: a file
+	/// named from a first line still being typed is named `r`, then `rē`, then
+	/// `rēķ`. Saving early costs nothing and protects the text; naming early
+	/// puts a wrong name on a real file, so it waits until the typing stops.
+	private func scheduleRename() {
+		renameWork?.cancel()
+		renameWork = Task { [weak self] in
+			try? await Task.sleep(for: .seconds(3))
+			guard !Task.isCancelled else { return }
+			self?.renameNow()
+		}
+	}
+
+	/// Save and name the sheet at once, for the moments there is no time to
+	/// wait for either timer: switching sheets, or leaving the app.
+	func settleNow() {
+		saveNow()
+		renameNow()
+	}
+
+	/// The file is called what the sheet's first line says, once that line has
+	/// been changed. `SheetCache.newName` decides; this carries it out.
+	func renameNow() {
+		renameWork?.cancel()
+
+		guard let name = current,
+			  let wanted = SheetCache.newName(for: name,
+											  titleWas: titleOnDisk, titleIs: document.name)
 		else { return }
 
+		titleOnDisk = document.name
+
+		guard cache.rename(name, to: wanted, source: folder) else { return }
+
 		current = wanted
+		sheets = cache.names()
 	}
 
 	func saveNow() {
@@ -245,7 +280,6 @@ final class PhoneStore: ObservableObject {
 
 		_ = try? cache.write(contents, to: current, source: folder)
 		contentsOnDisk = contents
-		renameIfStillUntitled()
 		sheets = cache.names()
 	}
 }

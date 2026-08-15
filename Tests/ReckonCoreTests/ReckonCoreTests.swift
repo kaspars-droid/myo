@@ -800,6 +800,80 @@ final class SheetCacheTests: XCTestCase {
 		XCTAssertEqual(cache.names(), ["a.myocalc", "b.myocalc", "c.myocalc"])
 	}
 
+	// MARK: - What a sheet's file is called
+
+	/// Typing a first line renames the file it is saved in.
+	func testAChangedFirstLineRenamesTheFile() {
+		XCTAssertEqual(SheetCache.newName(for: "Untitled.myocalc",
+										  titleWas: "", titleIs: "rēķini 2020"),
+					   "rēķini 2020.myocalc")
+	}
+
+	/// The reason there was a trail of files called `r`, `rē`, `rēķ`: the name
+	/// followed every keystroke. Nothing here can stop that on its own — the
+	/// stores wait for the typing to settle — but a half typed line is a
+	/// change like any other, so the waiting is the whole defence.
+	func testEveryStepOfATitleBeingTypedIsARename() {
+		var name = "Untitled.myocalc"
+		var title = ""
+
+		for step in ["r", "rē", "rēķ", "rēķi", "rēķini"] {
+			if let wanted = SheetCache.newName(for: name, titleWas: title, titleIs: step) {
+				name = wanted
+			}
+			title = step
+		}
+
+		XCTAssertEqual(name, "rēķini.myocalc")
+	}
+
+	/// A file its owner named keeps that name. `2020.myocalc` reads `#rēķini
+	/// 2020` on its first line and stays `2020.myocalc` until that line is
+	/// edited: renaming someone's file for a difference they never made is
+	/// how a folder full of them ends up unrecognisable.
+	func testAHandNamedFileIsLeftAlone() {
+		XCTAssertNil(SheetCache.newName(for: "2020.myocalc",
+										titleWas: "rēķini 2020", titleIs: "rēķini 2020"))
+	}
+
+	func testNoRenameWhenTheNameWouldNotChange() {
+		XCTAssertNil(SheetCache.newName(for: "rent.myocalc",
+										titleWas: "rent ", titleIs: "rent"))
+	}
+
+	/// A first line of punctuation leaves nothing to name a file after, so the
+	/// file keeps the name it has rather than being given an invented one.
+	func testNoRenameWhenNothingUsableIsLeft() {
+		XCTAssertNil(SheetCache.newName(for: "notes.myocalc", titleWas: "notes", titleIs: "///"))
+		XCTAssertNil(SheetCache.newName(for: "notes.myocalc", titleWas: "notes", titleIs: "   "))
+	}
+
+	/// A rename moves the file. Two sheets in a folder, and the older one is
+	/// not quietly replaced by the newer taking its name.
+	func testRenamingRefusesToOverwriteAnotherSheet() throws {
+		try putInSource("taken.myocalc", "10")
+		try putInSource("Untitled.myocalc", "20")
+		try cache.refresh(from: source)
+
+		XCTAssertFalse(cache.rename("Untitled.myocalc", to: "taken.myocalc", source: source))
+		XCTAssertEqual(cache.read("taken.myocalc"), "10")
+		XCTAssertEqual(cache.read("Untitled.myocalc"), "20")
+	}
+
+	/// The rename reaches the folder the sheets live in, not just the copy on
+	/// the phone, or the next sync would bring the old name back.
+	func testRenamingReachesTheSourceFolder() throws {
+		try putInSource("Untitled.myocalc", "35eur oil")
+		try cache.refresh(from: source)
+
+		XCTAssertTrue(cache.rename("Untitled.myocalc", to: "oil.myocalc", source: source))
+
+		let manager = FileManager.default
+		XCTAssertTrue(manager.fileExists(atPath: source.appendingPathComponent("oil.myocalc").path))
+		XCTAssertFalse(manager.fileExists(
+			atPath: source.appendingPathComponent("Untitled.myocalc").path))
+	}
+
 	/// Only sheets are sheets.
 	func testIgnoresEverythingThatIsNotASheet() throws {
 		try putInSource("notes.txt", "not a sheet")

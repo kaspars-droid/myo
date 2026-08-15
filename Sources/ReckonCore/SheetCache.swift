@@ -190,6 +190,26 @@ public struct SheetCache: Sendable {
 		return "\(cleaned).\(Self.fileExtension)"
 	}
 
+	/// What to rename a sheet's file to, now that its first line has changed.
+	///
+	/// Returns nil to leave the name alone: when the line has not changed,
+	/// when nothing usable is left of it, or when it asks for the name the
+	/// file already has.
+	///
+	/// Only a change renames, never a mere difference. A sheet called
+	/// `2020.myocalc` whose first line reads `#rēķini 2020` keeps the name it
+	/// was given until someone edits that line, because a file its owner
+	/// named is theirs to have named.
+	public static func newName(for current: String,
+							   titleWas: String, titleIs: String) -> String? {
+		guard titleIs != titleWas,
+			  let wanted = fileName(forTitle: titleIs),
+			  wanted != current
+		else { return nil }
+
+		return wanted
+	}
+
 	/// Renames a sheet, in the cache and wherever it came from.
 	@discardableResult
 	public func rename(_ name: String, to newName: String, source: URL?) -> Bool {

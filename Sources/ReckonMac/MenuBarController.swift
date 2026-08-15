@@ -106,7 +106,7 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 	}
 
 	@objc private func quit() {
-		SheetStore.shared.saveNow()
+		SheetStore.shared.settleNow()
 		NSApp.terminate(nil)
 	}
 }

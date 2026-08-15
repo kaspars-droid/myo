@@ -35,7 +35,11 @@ final class SheetStore: ObservableObject {
 	/// Exactly what was read from disk, so an untouched sheet is never
 	/// rewritten and an unchanged one is never written at all.
 	private var contentsOnDisk = ""
+	/// The first line the file is named for. A rename follows a change to it,
+	/// not a difference from it, so a sheet named by hand keeps that name.
+	private var titleOnDisk = ""
 	private var saveWork: Task<Void, Never>?
+	private var renameWork: Task<Void, Never>?
 	private let watcher = FolderWatcher()
 
 	private static let lastSheetKey = "lastSheet"
@@ -80,7 +84,7 @@ final class SheetStore: ObservableObject {
 	/// what is not.
 	private func leaveCurrentSheet(goingTo target: URL? = nil) {
 		if url != target { discardIfEmpty() }
-		saveNow()
+		settleNow()
 	}
 
 	/// An empty sheet is scratch, so switching away from one throws it out
@@ -128,6 +132,7 @@ final class SheetStore: ObservableObject {
 
 		contentsOnDisk = text
 		document = SheetDocument(text: text)
+		titleOnDisk = document.name
 		url = target
 		UserDefaults.standard.set(target.path, forKey: Self.lastSheetKey)
 
@@ -181,6 +186,51 @@ final class SheetStore: ObservableObject {
 			guard !Task.isCancelled else { return }
 			self?.saveNow()
 		}
+
+		scheduleRename()
+	}
+
+	/// Renaming waits much longer than saving, and for a plain reason: a file
+	/// named from a first line still being typed is named `r`, then `rē`, then
+	/// `rēķ`. Saving early costs nothing and protects the text; naming early
+	/// puts a wrong name on a real file, so it waits until the typing stops.
+	private func scheduleRename() {
+		renameWork?.cancel()
+		renameWork = Task { [weak self] in
+			try? await Task.sleep(for: .seconds(3))
+			guard !Task.isCancelled else { return }
+			self?.renameNow()
+		}
+	}
+
+	/// Save and name the sheet at once, for the moments there is no time to
+	/// wait for either timer: switching sheets, or quitting.
+	func settleNow() {
+		saveNow()
+		renameNow()
+	}
+
+	/// The file is called what the sheet's first line says, once that line has
+	/// been changed. `SheetCache.newName` decides; this carries it out.
+	func renameNow() {
+		renameWork?.cancel()
+
+		guard let current = url,
+			  let wanted = SheetCache.newName(for: current.lastPathComponent,
+											  titleWas: titleOnDisk, titleIs: document.name)
+		else { return }
+
+		titleOnDisk = document.name
+
+		let target = current.deletingLastPathComponent().appendingPathComponent(wanted)
+		guard !FileManager.default.fileExists(atPath: target.path),
+			  (try? FileManager.default.moveItem(at: current, to: target)) != nil
+		else { return }
+
+		url = target
+		UserDefaults.standard.set(target.path, forKey: Self.lastSheetKey)
+		watcher.watch(folder: folder, file: target)
+		refreshEntries()
 	}
 
 	func saveNow() {
@@ -192,31 +242,10 @@ final class SheetStore: ObservableObject {
 		do {
 			try contents.write(to: url, atomically: true, encoding: .utf8)
 			contentsOnDisk = contents
-			renameIfStillUntitled()
-			refreshEntries()   // the first line, and so the name, may have changed
+			refreshEntries()   // the first line, and so the name shown, may have changed
 		} catch {
 			NSSound.beep()
 		}
-	}
-
-	/// A new sheet is called Untitled until it says what it is.
-	///
-	/// Only the name this app invented is replaced. A sheet you named yourself
-	/// keeps that name however its first line changes, because renaming
-	/// someone's file out from under them is not a thing to do twice.
-	private func renameIfStillUntitled() {
-		guard let current = url, SheetCache.isAutomatic(current.lastPathComponent),
-			  let wanted = SheetCache.fileName(forTitle: document.name)
-		else { return }
-
-		let target = current.deletingLastPathComponent().appendingPathComponent(wanted)
-		guard !FileManager.default.fileExists(atPath: target.path),
-			  (try? FileManager.default.moveItem(at: current, to: target)) != nil
-		else { return }
-
-		url = target
-		UserDefaults.standard.set(target.path, forKey: Self.lastSheetKey)
-		watcher.watch(folder: folder, file: target)
 	}
 
 	// MARK: - The folder
@@ -240,6 +269,9 @@ final class SheetStore: ObservableObject {
 
 		contentsOnDisk = text
 		document = SheetDocument(text: text)
+		// Someone else's edit to the first line is not this app's cue to
+		// rename their file.
+		titleOnDisk = document.name
 	}
 
 	func refreshEntries() {
