@@ -249,11 +249,15 @@ final class SheetStore: ObservableObject {
 		}
 
 		let contents = (try? FileManager.default.contentsOfDirectory(
-			at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+			at: folder, includingPropertiesForKeys: [.contentModificationDateKey],
+			options: [.skipsHiddenFiles]
 		)) ?? []
 
-		entries = contents
-			.filter { $0.pathExtension.lowercased() == Self.fileExtension }
+		let sheets = contents.filter { $0.pathExtension.lowercased() == Self.fileExtension }
+
+		// Ordered before the names are worked out, so the list is not
+		// reshuffled by what happens to be on a sheet's first line.
+		entries = SheetOrder.lastEditedFirst(sheets)
 			.map { file in
 				// A sheet is called by its first line, not its file name.
 				let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
@@ -267,12 +271,6 @@ final class SheetStore: ObservableObject {
 					: SheetDocument(text: text).name
 
 				return SheetEntry(url: file, name: named)
-			}
-			// Ordered by file name, not by the name shown. Sorting on the
-			// shown name would shuffle the list as you typed the first line.
-			.sorted {
-				$0.url.lastPathComponent.localizedStandardCompare($1.url.lastPathComponent)
-					== .orderedAscending
 			}
 	}
 

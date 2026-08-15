@@ -832,6 +832,33 @@ final class SheetCacheTests: XCTestCase {
 		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
 	}
 
+	/// The sheet wanted next is nearly always the one just put down.
+	func testTheLastEditedSheetComesFirst() throws {
+		try putInSource("aaa.myocalc", "oldest", ageInSeconds: 3600)
+		try putInSource("zzz.myocalc", "newest")
+		try putInSource("mmm.myocalc", "middling", ageInSeconds: 600)
+
+		try cache.refresh(from: source)
+
+		XCTAssertEqual(cache.names(), ["zzz.myocalc", "mmm.myocalc", "aaa.myocalc"])
+	}
+
+	/// Two sheets written in the same second must not swap places between one
+	/// listing and the next.
+	func testSheetsOfTheSameAgeAreOrderedByName() throws {
+		let stamp = Date().addingTimeInterval(-120)
+		for name in ["b.myocalc", "a.myocalc", "c.myocalc"] {
+			try putInSource(name, "10")
+			try FileManager.default.setAttributes(
+				[.modificationDate: stamp],
+				ofItemAtPath: source.appendingPathComponent(name).path)
+		}
+
+		try cache.refresh(from: source)
+
+		XCTAssertEqual(cache.names(), ["a.myocalc", "b.myocalc", "c.myocalc"])
+	}
+
 	/// Only sheets are sheets.
 	func testIgnoresEverythingThatIsNotASheet() throws {
 		try putInSource("notes.txt", "not a sheet")

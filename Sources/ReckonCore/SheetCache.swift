@@ -39,12 +39,11 @@ public struct SheetCache: Sendable {
 
 	public func names() -> [String] {
 		let contents = (try? manager.contentsOfDirectory(
-			at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+			at: folder, includingPropertiesForKeys: [.contentModificationDateKey],
+			options: [.skipsHiddenFiles])) ?? []
 
-		return contents
-			.filter { $0.pathExtension.lowercased() == Self.fileExtension }
-			.map(\.lastPathComponent)
-			.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+		let sheets = contents.filter { $0.pathExtension.lowercased() == Self.fileExtension }
+		return SheetOrder.lastEditedFirst(sheets).map(\.lastPathComponent)
 	}
 
 	public func read(_ name: String) -> String? {
