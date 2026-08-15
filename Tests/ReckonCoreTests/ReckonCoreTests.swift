@@ -516,11 +516,50 @@ final class GrandTotalTests: XCTestCase {
 		"""), ["€50", "$20"])
 	}
 
-	func testAssignmentsCountToo() {
+	/// Naming a number is not spending it. A sheet that opens by declaring a
+	/// rate and a headcount used to add both into the bar along the bottom,
+	/// which made the total of every sheet using names meaningless.
+	func testDefinitionsAreNotAmounts() {
 		XCTAssertEqual(totals("""
 		rent = 800
 		food = 200
-		"""), ["1,000"])
+		"""), [])
+	}
+
+	func testALineUsingANameIsStillAnAmount() {
+		XCTAssertEqual(totals("""
+		rate = 12
+		3 * rate    # three hours
+		5 * rate    # five hours
+		"""), ["96"])
+	}
+
+	/// `sum` is already left out. So is anything worked out from a line that
+	/// is in the column, or the same figures would be counted twice.
+	func testLinesWorkedOutFromOtherLinesAreLeftOut() {
+		XCTAssertEqual(totals("""
+		2210
+		480
+		prev * 0.21
+		"""), ["2,690"])
+
+		XCTAssertEqual(totals("""
+		100
+		200
+		line 1 * 2
+		"""), ["300"])
+	}
+
+	/// The bar and the block above a `sum` agree about what an amount is.
+	func testADefinitionClosesTheBlockAboveASum() {
+		let lines = Sheet().evaluate("""
+		rate = 12
+		3 * rate
+		5 * rate
+		sum
+		""")
+
+		XCTAssertEqual(lines[3].formatted, "96")
 	}
 
 	func testEmptySheetHasNoTotal() {

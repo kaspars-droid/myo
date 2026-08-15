@@ -20,8 +20,9 @@ public struct Line: Equatable, Sendable {
 	public let value: Quantity?
 	public let formatted: String?
 	public let error: String?
-	/// A total, which is excluded from other totals so nothing counts twice.
-	public let isSubtotal: Bool
+	/// Whether this line is one of the amounts, as opposed to a total of them
+	/// or the definition of a name. Only the amounts are added up.
+	public let countsTowardTotal: Bool
 
 	public var hasValue: Bool { value != nil }
 }
@@ -64,7 +65,7 @@ public struct Sheet: Sendable {
 		var sums: [String?: Decimal] = [:]
 
 		for line in lines {
-			guard let value = line.value, !line.isSubtotal else { continue }
+			guard let value = line.value, line.countsTowardTotal else { continue }
 			if sums[value.currency] == nil {
 				sums[value.currency] = 0
 				order.append(value.currency)
@@ -97,9 +98,9 @@ public struct Sheet: Sendable {
 		let trimmed = code.trimmingCharacters(in: .whitespaces)
 
 		func record(_ kind: Line.Kind, value: Quantity?, error: String? = nil,
-					isSubtotal: Bool = false) -> Line {
+					countsTowardTotal: Bool = false) -> Line {
 			context.lineValues.append(value)
-			context.lineIsSubtotal.append(isSubtotal)
+			context.lineCountsTowardTotal.append(countsTowardTotal)
 			context.lineIsSeparator.append(kind == .blank)
 			return Line(number: number,
 						text: text,
@@ -109,7 +110,7 @@ public struct Sheet: Sendable {
 						value: value,
 						formatted: value.map { format($0) },
 						error: error,
-						isSubtotal: isSubtotal)
+						countsTowardTotal: countsTowardTotal)
 		}
 
 		if trimmed.isEmpty {
@@ -131,12 +132,16 @@ public struct Sheet: Sendable {
 		do {
 			let value = try Evaluator(context: context).evaluate(parsed.expr)
 
+			// A definition is not an expense. `rate = 0.21` showing up in the
+			// bar along the bottom made the total of any sheet using names
+			// meaningless, which is the whole point of the bar.
 			if let name = parsed.name {
 				context.variables[name] = value
-				return record(.assignment(name), value: value, isSubtotal: parsed.expr.isSubtotal)
+				return record(.assignment(name), value: value, countsTowardTotal: false)
 			}
 
-			return record(.result, value: value, isSubtotal: parsed.expr.isSubtotal)
+			return record(.result, value: value,
+						  countsTowardTotal: !parsed.expr.restatesOtherLines)
 		} catch let error as EvaluationError {
 			return record(.prose, value: nil, error: error.message)
 		} catch {

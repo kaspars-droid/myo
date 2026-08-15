@@ -6,8 +6,8 @@ struct Context {
 	var variables: [String: Quantity] = [:]
 	/// One entry per line so far; nil where the line produced no value.
 	var lineValues: [Quantity?] = []
-	/// Which of those lines were themselves totals.
-	var lineIsSubtotal: [Bool] = []
+	/// Which of those lines were amounts, rather than totals or definitions.
+	var lineCountsTowardTotal: [Bool] = []
 	/// Blank lines, the only thing that divides one tally from the next.
 	var lineIsSeparator: [Bool] = []
 
@@ -21,7 +21,8 @@ struct Context {
 	/// A comment or a line of prose is stepped over rather than treated as a
 	/// divider, so annotating a column does not cut the column in half.
 	///
-	/// A subtotal does close the block. Without that, a second `sum` further
+	/// Anything that is not one of the amounts does close the block: a running
+	/// total, or a name being defined. Without that, a second `sum` further
 	/// down would add the first one's total to its own inputs and quietly
 	/// count them twice.
 	var block: [Quantity] {
@@ -29,7 +30,9 @@ struct Context {
 
 		for offset in lineValues.indices.reversed() {
 			if lineIsSeparator.indices.contains(offset) && lineIsSeparator[offset] { break }
-			if lineIsSubtotal.indices.contains(offset) && lineIsSubtotal[offset] { break }
+			if lineCountsTowardTotal.indices.contains(offset),
+			   !lineCountsTowardTotal[offset],
+			   lineValues[offset] != nil { break }
 			guard let value = lineValues[offset] else { continue }
 			values.append(value)
 		}

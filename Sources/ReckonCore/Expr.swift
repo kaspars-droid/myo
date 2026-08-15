@@ -21,22 +21,26 @@ indirect enum Expr: Equatable {
 }
 
 extension Expr {
-	/// True when the line is a total rather than another input to one, which
-	/// is what lets a later total know where its own inputs begin.
-	var isSubtotal: Bool {
+	/// True when the line restates figures that are already in the column.
+	///
+	/// Every reference counts, not only `sum`: `prev * 0.21` is worked out
+	/// from the line above, and `line 3 * 2` from line three, so adding either
+	/// to the column would count those figures twice. A variable is not a
+	/// reference to a line — it is a name for a number — so a line using one
+	/// is an entry like any other, and it is the definition itself that is
+	/// kept out of the total.
+	var restatesOtherLines: Bool {
 		switch self {
-		case .reference(.sum), .reference(.average):
-			return true
 		case .reference:
-			return false
+			return true
 		case .number, .money, .variable:
 			return false
 		case .percent(let inner), .unary(_, let inner):
-			return inner.isSubtotal
+			return inner.restatesOtherLines
 		case .percentOf(let a, let b), .binary(_, let a, let b):
-			return a.isSubtotal || b.isSubtotal
+			return a.restatesOtherLines || b.restatesOtherLines
 		case .call(_, let arguments):
-			return arguments.contains(where: \.isSubtotal)
+			return arguments.contains(where: \.restatesOtherLines)
 		}
 	}
 }
