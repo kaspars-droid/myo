@@ -10,6 +10,11 @@ enum Token: Equatable {
 	case rightParen
 	case comma
 	case equals
+
+	var isNumber: Bool {
+		if case .number = self { return true }
+		return false
+	}
 }
 
 /// Turns a single line into tokens. Returns nil when the line contains
@@ -57,6 +62,18 @@ struct Lexer {
 			if character.isNumber || (isDecimalPoint(character) && peekIsNumber(at: index + 1)) {
 				guard let number = readNumber() else { return nil }
 				tokens.append(.number(number))
+				continue
+			}
+
+			// `14x100`, and `14 x 100`. It only becomes a sign once the line
+			// has an amount for it to multiply and a number follows it, so a
+			// sheet is still free to open with `x = 5`, and `5 x` is a five
+			// with a letter after it.
+			if character == "x" || character == "X",
+			   endsAnAmount(tokens.last) || tokens.contains(where: \.isNumber),
+			   digitFollows(index + 1) {
+				tokens.append(.op("*"))
+				index += 1
 				continue
 			}
 
@@ -111,6 +128,27 @@ struct Lexer {
 		character == "." || (commaIsDecimal && character == ",")
 	}
 
+	/// Whether a token could be the end of the left hand side of a sum. A word
+	/// in between is allowed for by the caller, so `5 boxes x 3` reads the same
+	/// as `5 boxes * 3` rather than quietly answering five.
+	private func endsAnAmount(_ token: Token?) -> Bool {
+		switch token {
+		case .number, .rightParen, .percent, .currency:
+			return true
+		case .word(let word):
+			return Currency.isCode(word)   // `14 eur x 3`
+		default:
+			return false
+		}
+	}
+
+	/// The next thing along, once any spaces are out of the way, is a digit.
+	private func digitFollows(_ start: Int) -> Bool {
+		var position = start
+		while position < scalars.count, scalars[position] == " " { position += 1 }
+		return position < scalars.count && scalars[position].isNumber
+	}
+
 	private func peekIsNumber(at position: Int) -> Bool {
 		position < scalars.count && scalars[position].isNumber
 	}
@@ -141,7 +179,10 @@ struct Lexer {
 
 		while index < scalars.count {
 			let character = scalars[index]
-			guard character.isLetter || character == "_" || character.isNumber else { break }
+			// A digit ends the word rather than joining it. `malt613,33` is a
+			// note and an amount written without a space, and reading it as
+			// one word left the `,33` to start a number of its own.
+			guard character.isLetter || character == "_" else { break }
 			text.append(character)
 			index += 1
 		}

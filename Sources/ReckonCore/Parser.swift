@@ -28,6 +28,19 @@ struct Parser {
 			}
 		}
 
+		// `87x14 = 1220-25%`. The left is not a name, so it is a note, and
+		// what the line is worth is on the right. Only taken when the right
+		// hand side is a whole expression on its own, so a stray `=` cannot
+		// swallow the line.
+		if let split = tokens.firstIndex(of: .equals), split + 1 < tokens.count {
+			let right = Array(tokens[(split + 1)...])
+			var parser = Parser(tokens: right, knownVariables: knownVariables)
+
+			if let expr = parser.parseExpression(), parser.isAtEnd {
+				return (nil, expr)
+			}
+		}
+
 		// Otherwise the line is an amount, possibly with something written
 		// beside it: `35eur oil change`.
 		var parser = Parser(tokens: tokens, knownVariables: knownVariables)

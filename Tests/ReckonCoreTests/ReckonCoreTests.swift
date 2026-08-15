@@ -289,11 +289,82 @@ final class DescribedAmountTests: XCTestCase {
 		XCTAssertEqual(sheet.evaluate("min(1; 2)")[0].formatted, "1")
 	}
 
+	/// `malt613,33` is a note and an amount run together. Reading it as one
+	/// word left the `,33` to start a number of its own, and the line came
+	/// out as 0.2475 instead of 460.
+	func testAWordEndsWhereTheNumberBegins() {
+		XCTAssertEqual(sheet.evaluate("pa strau malt613.33-25%")[0].formatted, "459.9975")
+		XCTAssertEqual(sheet.evaluate("7 mortar 10kg")[0].formatted, "7")
+		XCTAssertEqual(sheet.evaluate("35eur oil change")[0].formatted, "€35")
+	}
+
+	/// A typed `=` with something that is not a name on its left: the left is
+	/// the note and the sum is on the right.
+	func testTheAnswerCanBeOnTheRightOfATypedEquals() {
+		XCTAssertEqual(sheet.evaluate("loco esti 87x14=1220-25%")[0].formatted, "915")
+	}
+
+	func testAnAssignmentIsStillAnAssignment() {
+		let lines = sheet.evaluate("car repair = 350")
+
+		XCTAssertEqual(lines[0].kind, .assignment("car repair"))
+		XCTAssertEqual(lines[0].formatted, "350")
+	}
+
 	func testATitleIsStillProse() {
 		let lines = sheet.evaluate("flat renovation")
 
 		XCTAssertEqual(lines[0].kind, .prose)
 		XCTAssertNil(lines[0].value)
+	}
+}
+
+/// `x` is how people write a times sign when they are not thinking about it.
+final class TimesSignTests: XCTestCase {
+	private let sheet = Sheet()
+	private let latvian = Sheet(locale: Locale(identifier: "lv_LV"))
+
+	func testXBetweenTwoNumbers() {
+		XCTAssertEqual(sheet.evaluate("14x100")[0].formatted, "1,400")
+		XCTAssertEqual(sheet.evaluate("14 x 100")[0].formatted, "1,400")
+		XCTAssertEqual(sheet.evaluate("3x4")[0].formatted, "12")
+		XCTAssertEqual(sheet.evaluate("(2+3) x 4")[0].formatted, "20")
+		XCTAssertEqual(sheet.evaluate("14 eur x 3")[0].formatted, "€42")
+	}
+
+	/// The line that was reported: it used to answer 14, having quietly
+	/// dropped the hundred.
+	func testTheWholeLine() {
+		XCTAssertEqual(latvian.evaluate("14x100-25,5%")[0].formatted, "1043")
+		XCTAssertEqual(sheet.evaluate("14x100-25.5%")[0].formatted, "1,043")
+	}
+
+	func testItReadsTheSameAsAStar() {
+		XCTAssertEqual(sheet.evaluate("5 boxes x 3")[0].formatted,
+					   sheet.evaluate("5 boxes * 3")[0].formatted)
+	}
+
+	/// A sheet is still free to call something x. Nothing follows the letter
+	/// there, and nothing precedes it, so it is never taken for a sign.
+	func testAVariableMayStillBeCalledX() {
+		let lines = sheet.evaluate("""
+		x = 5
+		x * 2
+		""")
+
+		XCTAssertEqual(lines[0].kind, .assignment("x"))
+		XCTAssertEqual(lines[1].formatted, "10")
+	}
+
+	func testALetterWithNoNumberAfterItIsJustALetter() {
+		XCTAssertEqual(sheet.evaluate("5 x")[0].formatted, "5")
+	}
+
+	/// Nothing precedes the letter here, so it is a word and the line is a
+	/// hundred with a label, the same as `abc 100`. Were it read as a sign it
+	/// would have no left hand side and the line would be prose.
+	func testALeadingXIsAWordNotASign() {
+		XCTAssertEqual(sheet.evaluate("x100")[0].formatted, "100")
 	}
 }
 
