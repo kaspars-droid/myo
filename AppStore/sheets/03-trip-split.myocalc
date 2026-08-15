@@ -9,4 +9,4 @@
 64 museum, tram 28
 90 fuel, tolls
 sum        # the trip
-sum / 4    # each of us owes
+prev / 4   # each of us owes

@@ -9,4 +9,4 @@
 310 labour 4h
 95 diagnostics
 sum          # the bill
-sum * 0.21   # of which VAT
+prev * 0.21  # of which VAT

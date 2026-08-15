@@ -9,6 +9,5 @@
 275 eur     # support
 1150 eur    # rebuild, phase one
 390 eur     # copy and edit
-sum         # net
-sum * 0.21  # VAT at 21%
-sum * 1.21  # to invoice
+sum          # net
+prev * 1.21  # to invoice, with VAT
