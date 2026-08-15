@@ -290,8 +290,6 @@ struct Parser {
 		switch lowercased {
 		case "prev", "previous", "ans":
 			return .reference(.previous)
-		case "sum", "total":
-			return .reference(.sum)
 		case "avg", "average", "mean":
 			return .reference(.average)
 		case "line":
@@ -334,7 +332,11 @@ struct Parser {
 }
 
 enum Reserved {
+	/// Words a variable may not be called, because the parser reads them as
+	/// something else. `sum` and `total` are not among them any more: the bar
+	/// along the bottom is the total of the sheet, so the word was a second
+	/// answer to a question already answered, and it is free to be a name.
 	static let all: Set<String> = [
-		"prev", "previous", "ans", "sum", "total", "avg", "average", "mean", "line", "of"
+		"prev", "previous", "ans", "avg", "average", "mean", "line", "of"
 	]
 }

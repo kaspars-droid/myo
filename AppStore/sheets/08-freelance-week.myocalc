@@ -5,5 +5,3 @@
 6 h * 65     # Thursday
 11 h * 95    # Friday, the rush job
 4 h * 65     # Saturday morning
-sum          # billed
-prev * 0.75  # after tax

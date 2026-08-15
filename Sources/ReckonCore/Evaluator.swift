@@ -168,9 +168,6 @@ struct Evaluator {
 			guard let value = context.previous else { throw EvaluationError.noPreviousValue }
 			return value
 
-		case .sum:
-			return try total(of: context.block)
-
 		case .average:
 			let block = context.block
 			let sum = try total(of: block)

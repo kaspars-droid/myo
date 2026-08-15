@@ -1,13 +1,11 @@
 # March invoices
 
-2210 eur    # design
-480 eur     # consulting
-120 eur     # licence
-340 eur     # retainer
-95 eur      # hosting
-610 eur     # workshop
-275 eur     # support
-1150 eur    # rebuild, phase one
-390 eur     # copy and edit
-sum          # net
-prev * 1.21  # to invoice, with VAT
+2210 eur + 21%   # design
+480 eur + 21%    # consulting
+120 eur + 21%    # licence
+340 eur + 21%    # retainer
+95 eur + 21%     # hosting
+610 eur + 21%    # workshop
+275 eur + 21%    # support
+1150 eur + 21%   # rebuild, phase one
+390 eur + 21%    # copy and edit

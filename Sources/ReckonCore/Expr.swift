@@ -3,7 +3,6 @@ import Foundation
 /// A reference to something the sheet already worked out.
 enum Reference: Equatable {
 	case previous       // prev
-	case sum            // sum / total of the block above
 	case average        // avg / average of the block above
 	case line(Int)      // line 3
 }

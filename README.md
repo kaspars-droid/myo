@@ -93,14 +93,19 @@ sqrt(16)             sqrt abs round floor ceil min max pow log ln
 
 10
 20
-sum                  sum, total, avg of the block above
+avg                  the average of the block above
 prev                 the line before
 line 2               a line by number
 ```
 
-A blank line ends a block, so one sheet can hold several tallies. A subtotal
-also ends its block, so totalling again lower down does not fold the earlier
-total back in and count those numbers twice.
+There is no `sum`. The bar along the bottom already adds the column up, and a
+word that answers a question the window has answered already is one more thing
+to know for nothing. `sum` and `total` are ordinary words now, free to be used
+as names.
+
+A blank line ends a block, so one sheet can hold several tallies. A line worked
+out from a block also ends it, so asking again lower down does not fold the
+earlier answer in with the numbers it came from.
 
 ## Figures with words beside them
 
@@ -143,8 +148,17 @@ other line and rewrite the whole file.
 ## The bar along the bottom
 
 Everything in the result column is added up and shown at the foot of the
-window. Totals already written into the sheet with `sum` are left out of it, so
-nothing is counted twice, and each currency gets its own line.
+window, with a line per currency.
+
+Two kinds of line are not amounts and stay out of it. A definition is a name
+for a number, not an entry, so `rate = 0.21` is not money spent. And a line
+worked out from other lines — `prev * 0.21`, `line 3 * 2` — restates figures
+that are already in the column, so counting it would count them twice. A line
+that merely uses a name is an amount like any other.
+
+Figures are shown to two decimals. That is the display only: the arithmetic
+carries every digit, so the bar adds the exact column and rounds once, at the
+end.
 
 ## Money
 

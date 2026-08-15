@@ -8,5 +8,3 @@
 62 coolant, brake fluid
 310 labour 4h
 95 diagnostics
-sum          # the bill
-prev * 0.21  # of which VAT

@@ -96,15 +96,7 @@ final class SheetTests: XCTestCase {
 		XCTAssertEqual(lines[1].formatted, "700")
 	}
 
-	func testSumAndAverageOfTheBlockAbove() {
-		let lines = sheet.evaluate("""
-		10
-		20
-		30
-		sum
-		""")
-		XCTAssertEqual(lines[3].formatted, "60")
-
+	func testAverageOfTheBlockAbove() {
 		let averaged = sheet.evaluate("""
 		10
 		20
@@ -112,6 +104,20 @@ final class SheetTests: XCTestCase {
 		avg
 		""")
 		XCTAssertEqual(averaged[3].formatted, "20")
+	}
+
+	/// Adding the column up is what the bar along the bottom is for, so the
+	/// word is not a word any more and a sheet may use it as a name.
+	func testSumIsAnOrdinaryWordNow() {
+		XCTAssertEqual(sheet.evaluateOne("sum").kind, .prose)
+
+		let lines = sheet.evaluate("""
+		sum = 500
+		sum / 2
+		""")
+
+		XCTAssertEqual(lines[0].kind, .assignment("sum"))
+		XCTAssertEqual(lines[1].formatted, "250")
 	}
 
 	func testPreviousAndLineReferences() {
@@ -126,51 +132,51 @@ final class SheetTests: XCTestCase {
 		XCTAssertEqual(lines[3].formatted, "15")
 	}
 
-	/// A subtotal closes its block, so totalling again below does not fold the
-	/// earlier total back in and count those numbers twice.
-	func testSubtotalsDoNotDoubleCount() {
+	/// A line worked out from the block closes it, so averaging again below
+	/// does not fold the earlier answer in with the numbers it came from.
+	func testABlockAnswerDoesNotFoldBackIn() {
 		let lines = sheet.evaluate("""
 		10
 		20
-		sum
-		5
-		6
-		sum
+		avg
+		4
+		8
+		avg
 		""")
 
-		XCTAssertEqual(lines[2].formatted, "30")
-		XCTAssertEqual(lines[5].formatted, "11")
+		XCTAssertEqual(lines[2].formatted, "15")
+		XCTAssertEqual(lines[5].formatted, "6")
 	}
 
-	/// The same applies when the subtotal is carried into another expression,
-	/// such as adding tax to it.
-	func testDerivedSubtotalAlsoClosesTheBlock() {
+	/// The same applies when that answer is carried into another expression.
+	func testADerivedAnswerAlsoClosesTheBlock() {
 		let lines = sheet.evaluate("""
 		100
 		200
-		sum * 1.21
+		avg * 2
 		7
-		sum
+		9
+		avg
 		""")
 
-		XCTAssertEqual(lines[2].formatted, "363")
-		XCTAssertEqual(lines[4].formatted, "7")
+		XCTAssertEqual(lines[2].formatted, "300")
+		XCTAssertEqual(lines[5].formatted, "8")
 	}
 
 	/// A blank line ends a block, so one sheet can hold several tallies.
-	func testBlankLineSeparatesTotals() {
+	func testBlankLineSeparatesBlocks() {
 		let lines = sheet.evaluate("""
 		10
 		20
-		sum
+		avg
 
-		5
-		6
-		sum
+		4
+		8
+		avg
 		""")
 
-		XCTAssertEqual(lines[2].formatted, "30")
-		XCTAssertEqual(lines[6].formatted, "11")
+		XCTAssertEqual(lines[2].formatted, "15")
+		XCTAssertEqual(lines[6].formatted, "6")
 	}
 
 	func testUnknownWordsMakeTheLineProse() {
@@ -439,25 +445,21 @@ final class CurrencyTests: XCTestCase {
 	}
 
 	func testTotallingAColumnOfPrices() {
+		let sheet = Sheet()
 		let lines = sheet.evaluate("""
 		35eur
 		45eur
 		12.50eur
-		sum
 		""")
 
-		XCTAssertEqual(lines[3].formatted, "€92.50")
+		XCTAssertEqual(sheet.grandTotal(of: lines).map { sheet.format($0) }, ["€92.50"])
 	}
 
-	func testTotallingRefusesMixedCurrencies() {
-		let lines = sheet.evaluate("""
-		35eur
-		45usd
-		sum
-		""")
+	func testArithmeticRefusesMixedCurrencies() {
+		let line = sheet.evaluateOne("35eur + 45usd")
 
-		XCTAssertNil(lines[2].value)
-		XCTAssertEqual(lines[2].error, "Cannot mix EUR and USD without an exchange rate")
+		XCTAssertNil(line.value)
+		XCTAssertEqual(line.error, "Cannot mix EUR and USD without an exchange rate")
 	}
 
 	func testMoneyVariables() {
@@ -470,13 +472,9 @@ final class CurrencyTests: XCTestCase {
 	}
 
 	func testDecimalExactnessHoldsForMoney() {
-		let lines = sheet.evaluate("""
-		0.10eur
-		0.20eur
-		sum
-		""")
+		let line = sheet.evaluateOne("0.10eur + 0.20eur")
 
-		XCTAssertEqual(lines[2].value, Quantity(Decimal(string: "0.30")!, "EUR"))
+		XCTAssertEqual(line.value, Quantity(Decimal(string: "0.30")!, "EUR"))
 	}
 }
 
@@ -510,7 +508,7 @@ final class CommentTests: XCTestCase {
 		let lines = sheet.evaluate("""
 		100
 		# 200
-		sum
+		avg
 		""")
 
 		XCTAssertEqual(lines[1].kind, .comment)
@@ -527,10 +525,10 @@ final class CommentTests: XCTestCase {
 		let lines = sheet.evaluate("""
 		10 # first
 		20 # second
-		sum
+		avg
 		""")
 
-		XCTAssertEqual(lines[2].formatted, "30")
+		XCTAssertEqual(lines[2].formatted, "15")
 	}
 }
 
@@ -622,15 +620,15 @@ final class GrandTotalTests: XCTestCase {
 	}
 
 	/// The bar and the block above a `sum` agree about what an amount is.
-	func testADefinitionClosesTheBlockAboveASum() {
+	func testADefinitionClosesTheBlockAbove() {
 		let lines = Sheet().evaluate("""
 		rate = 12
 		3 * rate
 		5 * rate
-		sum
+		avg
 		""")
 
-		XCTAssertEqual(lines[3].formatted, "96")
+		XCTAssertEqual(lines[3].formatted, "48")
 	}
 
 	/// Two decimals is the display. The arithmetic keeps every digit, so the
@@ -736,10 +734,10 @@ final class StoredAnswerTests: XCTestCase {
 
 	/// The calculator works from the line, never from Numi's answer to it.
 	func testTheAnswerIsNotFedBackIntoTheMath() {
-		let document = SheetDocument(text: "10\(marker)10\n20\(marker)20\nsum")
+		let document = SheetDocument(text: "10\(marker)10\n20\(marker)20\nprev * 3")
 		let lines = Sheet().evaluate(document.text)
 
-		XCTAssertEqual(lines[2].formatted, "30")
+		XCTAssertEqual(lines[2].formatted, "60")
 	}
 }
 

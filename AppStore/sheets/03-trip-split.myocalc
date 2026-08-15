@@ -1,12 +1,10 @@
 # Lisbon, four of us
 
-860 flights
-1240 apartment
-315 car hire
-420 food, wine, coffee
-78 tram, metro
-145 tiles, ceramics
-64 museum, tram 28
-90 fuel, tolls
-sum        # the trip
-prev / 4   # each of us owes
+860 / 4    # flights
+1240 / 4   # apartment
+315 / 4    # car hire
+420 / 4    # food, wine, coffee
+78 / 4     # tram, metro
+145 / 4    # tiles, ceramics
+64 / 4     # museum, tram 28
+90 / 4     # fuel, tolls

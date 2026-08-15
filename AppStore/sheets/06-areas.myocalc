@@ -7,5 +7,3 @@
 1.8 * 1.2    # hall
 2.9 * 2.2    # study
 1.4 * 3.6    # landing
-sum          # to cover
-prev + 10%   # with offcuts
