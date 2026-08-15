@@ -99,9 +99,6 @@ public struct Sheet: Sendable {
 
 		func record(_ kind: Line.Kind, value: Quantity?, error: String? = nil,
 					countsTowardTotal: Bool = false) -> Line {
-			context.lineValues.append(value)
-			context.lineCountsTowardTotal.append(countsTowardTotal)
-			context.lineIsSeparator.append(kind == .blank)
 			return Line(number: number,
 						text: text,
 						code: code,
@@ -140,8 +137,7 @@ public struct Sheet: Sendable {
 				return record(.assignment(name), value: value, countsTowardTotal: false)
 			}
 
-			return record(.result, value: value,
-						  countsTowardTotal: !parsed.expr.restatesOtherLines)
+			return record(.result, value: value, countsTowardTotal: true)
 		} catch let error as EvaluationError {
 			return record(.prose, value: nil, error: error.message)
 		} catch {

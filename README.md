@@ -91,21 +91,17 @@ net * rate
 120 + 10%            percent of the left hand side
 sqrt(16)             sqrt abs round floor ceil min max pow log ln
 
-10
-20
-avg                  the average of the block above
-prev                 the line before
-line 2               a line by number
+rate = 0.21          a name for a number
+1850 * rate          and using it
 ```
 
-There is no `sum`. The bar along the bottom already adds the column up, and a
-word that answers a question the window has answered already is one more thing
-to know for nothing. `sum` and `total` are ordinary words now, free to be used
-as names.
+No line refers to another. There was a `sum`, a `total`, an `avg`, a `prev` and
+a `line 2`, and each of them needed a rule about where a block began before it
+could be trusted — a blank line ended one, a subtotal ended one, a definition
+ended one. That is a lot to know in a window you open to add up a receipt, and
+the bar along the bottom already answers the question all of it was for.
 
-A blank line ends a block, so one sheet can hold several tallies. A line worked
-out from a block also ends it, so asking again lower down does not fold the
-earlier answer in with the numbers it came from.
+They are ordinary words now, free to be used as names.
 
 ## Figures with words beside them
 
@@ -150,11 +146,9 @@ other line and rewrite the whole file.
 Everything in the result column is added up and shown at the foot of the
 window, with a line per currency.
 
-Two kinds of line are not amounts and stay out of it. A definition is a name
-for a number, not an entry, so `rate = 0.21` is not money spent. And a line
-worked out from other lines — `prev * 0.21`, `line 3 * 2` — restates figures
-that are already in the column, so counting it would count them twice. A line
-that merely uses a name is an amount like any other.
+One kind of line stays out of it. A definition is a name for a number, not an
+entry, so `rate = 0.21` is not money spent. A line that merely uses a name is
+an amount like any other.
 
 Figures are shown to two decimals. That is the display only: the arithmetic
 carries every digit, so the bar adds the exact column and rounds once, at the

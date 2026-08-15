@@ -96,88 +96,28 @@ final class SheetTests: XCTestCase {
 		XCTAssertEqual(lines[1].formatted, "700")
 	}
 
-	func testAverageOfTheBlockAbove() {
-		let averaged = sheet.evaluate("""
-		10
-		20
-		30
-		avg
-		""")
-		XCTAssertEqual(averaged[3].formatted, "20")
-	}
 
-	/// Adding the column up is what the bar along the bottom is for, so the
-	/// word is not a word any more and a sheet may use it as a name.
-	func testSumIsAnOrdinaryWordNow() {
-		XCTAssertEqual(sheet.evaluateOne("sum").kind, .prose)
+	/// Nothing refers to another line any more. The bar along the bottom adds
+	/// the column up, and that was the only one of these worth the rule that
+	/// came with it. They are ordinary words now, free to be used as names.
+	func testTheOldReferenceWordsAreOrdinaryWords() {
+		for word in ["sum", "total", "prev", "avg", "average", "mean"] {
+			XCTAssertEqual(sheet.evaluateOne(word).kind, .prose, word)
+		}
 
 		let lines = sheet.evaluate("""
 		sum = 500
-		sum / 2
+		avg = 12
+		sum / 2 + avg
 		""")
 
 		XCTAssertEqual(lines[0].kind, .assignment("sum"))
-		XCTAssertEqual(lines[1].formatted, "250")
+		XCTAssertEqual(lines[2].formatted, "262")
 	}
 
-	func testPreviousAndLineReferences() {
-		let lines = sheet.evaluate("""
-		10
-		20
-		prev * 2
-		line 1 + 5
-		""")
 
-		XCTAssertEqual(lines[2].formatted, "40")
-		XCTAssertEqual(lines[3].formatted, "15")
-	}
 
-	/// A line worked out from the block closes it, so averaging again below
-	/// does not fold the earlier answer in with the numbers it came from.
-	func testABlockAnswerDoesNotFoldBackIn() {
-		let lines = sheet.evaluate("""
-		10
-		20
-		avg
-		4
-		8
-		avg
-		""")
 
-		XCTAssertEqual(lines[2].formatted, "15")
-		XCTAssertEqual(lines[5].formatted, "6")
-	}
-
-	/// The same applies when that answer is carried into another expression.
-	func testADerivedAnswerAlsoClosesTheBlock() {
-		let lines = sheet.evaluate("""
-		100
-		200
-		avg * 2
-		7
-		9
-		avg
-		""")
-
-		XCTAssertEqual(lines[2].formatted, "300")
-		XCTAssertEqual(lines[5].formatted, "8")
-	}
-
-	/// A blank line ends a block, so one sheet can hold several tallies.
-	func testBlankLineSeparatesBlocks() {
-		let lines = sheet.evaluate("""
-		10
-		20
-		avg
-
-		4
-		8
-		avg
-		""")
-
-		XCTAssertEqual(lines[2].formatted, "15")
-		XCTAssertEqual(lines[6].formatted, "6")
-	}
 
 	func testUnknownWordsMakeTheLineProse() {
 		let line = sheet.evaluateOne("bananas * 3")
@@ -508,11 +448,13 @@ final class CommentTests: XCTestCase {
 		let lines = sheet.evaluate("""
 		100
 		# 200
-		avg
 		""")
 
 		XCTAssertEqual(lines[1].kind, .comment)
-		XCTAssertEqual(lines[2].formatted, "100")   // the hidden 200 is not counted
+		XCTAssertNil(lines[1].value)
+
+		// The hidden 200 is not counted.
+		XCTAssertEqual(sheet.grandTotal(of: lines).map { sheet.format($0) }, ["100"])
 	}
 
 	func testDoubleSlashStillComments() {
@@ -521,14 +463,15 @@ final class CommentTests: XCTestCase {
 		XCTAssertEqual(line.comment, "// the answer")
 	}
 
-	func testCommentDoesNotBreakABlock() {
+	/// A note on the end of a line does not stop the line counting.
+	func testATrailingCommentDoesNotStopTheLineCounting() {
 		let lines = sheet.evaluate("""
 		10 # first
 		20 # second
-		avg
 		""")
 
-		XCTAssertEqual(lines[2].formatted, "15")
+		XCTAssertEqual(lines.map(\.formatted), ["10", "20"])
+		XCTAssertEqual(sheet.grandTotal(of: lines).map { sheet.format($0) }, ["30"])
 	}
 }
 
@@ -603,33 +546,7 @@ final class GrandTotalTests: XCTestCase {
 		"""), ["96"])
 	}
 
-	/// `sum` is already left out. So is anything worked out from a line that
-	/// is in the column, or the same figures would be counted twice.
-	func testLinesWorkedOutFromOtherLinesAreLeftOut() {
-		XCTAssertEqual(totals("""
-		2210
-		480
-		prev * 0.21
-		"""), ["2,690"])
 
-		XCTAssertEqual(totals("""
-		100
-		200
-		line 1 * 2
-		"""), ["300"])
-	}
-
-	/// The bar and the block above a `sum` agree about what an amount is.
-	func testADefinitionClosesTheBlockAbove() {
-		let lines = Sheet().evaluate("""
-		rate = 12
-		3 * rate
-		5 * rate
-		avg
-		""")
-
-		XCTAssertEqual(lines[3].formatted, "48")
-	}
 
 	/// Two decimals is the display. The arithmetic keeps every digit, so the
 	/// bar adds the exact figures and rounds once at the end rather than
@@ -734,10 +651,12 @@ final class StoredAnswerTests: XCTestCase {
 
 	/// The calculator works from the line, never from Numi's answer to it.
 	func testTheAnswerIsNotFedBackIntoTheMath() {
-		let document = SheetDocument(text: "10\(marker)10\n20\(marker)20\nprev * 3")
+		// The stored answer is deliberately wrong. The line is worth what it
+		// says, not what Numi wrote next to it.
+		let document = SheetDocument(text: "10 + 5\(marker)999")
 		let lines = Sheet().evaluate(document.text)
 
-		XCTAssertEqual(lines[2].formatted, "60")
+		XCTAssertEqual(lines[0].formatted, "15")
 	}
 }
 

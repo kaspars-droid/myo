@@ -287,22 +287,6 @@ struct Parser {
 			return .call(lowercased, arguments)
 		}
 
-		switch lowercased {
-		case "prev", "previous", "ans":
-			return .reference(.previous)
-		case "avg", "average", "mean":
-			return .reference(.average)
-		case "line":
-			// `line 3`
-			if case .number(let number)? = peek() {
-				index += 1
-				return .reference(.line(number.intValue))
-			}
-			return nil
-		default:
-			break
-		}
-
 		// Longest run of words that names a variable, so `car repair * 2` works.
 		var candidate = word
 		var length = 1
@@ -333,10 +317,7 @@ struct Parser {
 
 enum Reserved {
 	/// Words a variable may not be called, because the parser reads them as
-	/// something else. `sum` and `total` are not among them any more: the bar
-	/// along the bottom is the total of the sheet, so the word was a second
-	/// answer to a question already answered, and it is free to be a name.
-	static let all: Set<String> = [
-		"prev", "previous", "ans", "avg", "average", "mean", "line", "of"
-	]
+	/// something else. Only one is left: nothing refers to another line any
+	/// more, so `sum`, `prev`, `avg` and `line` are free to be names.
+	static let all: Set<String> = ["of"]
 }

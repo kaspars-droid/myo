@@ -1,44 +1,9 @@
 import Foundation
 
-/// What the lines above the current one produced, which is what `prev`, `sum`,
-/// `total`, `avg` and `line N` read from.
+/// The names a sheet has defined so far. Nothing else about the lines above
+/// is remembered, because nothing can refer to them.
 struct Context {
 	var variables: [String: Quantity] = [:]
-	/// One entry per line so far; nil where the line produced no value.
-	var lineValues: [Quantity?] = []
-	/// Which of those lines were amounts, rather than totals or definitions.
-	var lineCountsTowardTotal: [Bool] = []
-	/// Blank lines, the only thing that divides one tally from the next.
-	var lineIsSeparator: [Bool] = []
-
-	var previous: Quantity? {
-		lineValues.last(where: { $0 != nil }) ?? nil
-	}
-
-	/// The figures immediately above, back to the last blank line. Several
-	/// tallies can share one sheet, divided by blank lines.
-	///
-	/// A comment or a line of prose is stepped over rather than treated as a
-	/// divider, so annotating a column does not cut the column in half.
-	///
-	/// Anything that is not one of the amounts does close the block: a running
-	/// total, or a name being defined. Without that, a second `sum` further
-	/// down would add the first one's total to its own inputs and quietly
-	/// count them twice.
-	var block: [Quantity] {
-		var values: [Quantity] = []
-
-		for offset in lineValues.indices.reversed() {
-			if lineIsSeparator.indices.contains(offset) && lineIsSeparator[offset] { break }
-			if lineCountsTowardTotal.indices.contains(offset),
-			   !lineCountsTowardTotal[offset],
-			   lineValues[offset] != nil { break }
-			guard let value = lineValues[offset] else { continue }
-			values.append(value)
-		}
-
-		return values.reversed()
-	}
 }
 
 enum Functions {
@@ -65,9 +30,6 @@ struct Evaluator {
 		case .variable(let name):
 			guard let value = context.variables[name] else { throw EvaluationError.unknownName(name) }
 			return value
-
-		case .reference(let reference):
-			return try evaluate(reference)
 
 		case .percent(let inner):
 			let value = try plain(evaluate(inner), "A percentage")
@@ -160,37 +122,6 @@ struct Evaluator {
 		default:
 			throw EvaluationError.notANumber
 		}
-	}
-
-	private func evaluate(_ reference: Reference) throws -> Quantity {
-		switch reference {
-		case .previous:
-			guard let value = context.previous else { throw EvaluationError.noPreviousValue }
-			return value
-
-		case .average:
-			let block = context.block
-			let sum = try total(of: block)
-			return Quantity(sum.amount / Decimal(block.count), sum.currency)
-
-		case .line(let number):
-			let position = number - 1
-			guard position >= 0, position < context.lineValues.count,
-				  let value = context.lineValues[position] else {
-				throw EvaluationError.noPreviousValue
-			}
-			return value
-		}
-	}
-
-	private func total(of block: [Quantity]) throws -> Quantity {
-		guard !block.isEmpty else { throw EvaluationError.noPreviousValue }
-
-		var running = block[0]
-		for value in block.dropFirst() {
-			running = Quantity(running.amount + value.amount, try unify(running, value))
-		}
-		return running
 	}
 
 	// MARK: - Functions
