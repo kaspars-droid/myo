@@ -209,7 +209,10 @@ struct SheetTextView: NSViewRepresentable {
 			view.setSelectedRange(selected)
 
 			parent.text = view.string
-			(view.superview as? SheetEditorView)?.results.needsDisplay = true
+
+			let editor = view.superview as? SheetEditorView
+			editor?.results.needsDisplay = true
+			editor?.revealCaret()
 		}
 	}
 }
@@ -265,6 +268,50 @@ final class SheetEditorView: NSView {
 		manager.ensureLayout(for: container)
 
 		return max(manager.usedRect(for: container).height, LineStyle.lineHeight)
+	}
+
+	/// Brings the caret back into sight.
+	///
+	/// The text view does not scroll: it is laid out at its full height and
+	/// SwiftUI's scroll view is what moves. AppKit's own reveal, on the keypress
+	/// itself, is therefore too early — the sheet is still the height it was, so
+	/// a return typed at the bottom of a full window puts the new line past the
+	/// end of the scrolled content, behind the total bar. This asks again once
+	/// the sheet has been measured and laid out at its new height.
+	func revealCaret() {
+		DispatchQueue.main.async { [weak self] in
+			guard let self, let window else { return }
+
+			window.layoutIfNeeded()
+			guard let caret = caretRect() else { return }
+
+			// A line of air, so the caret is never flush against the bar.
+			scrollToVisible(caret.insetBy(dx: 0, dy: -LineStyle.lineHeight))
+		}
+	}
+
+	/// Where the caret is, in this view's coordinates.
+	private func caretRect() -> NSRect? {
+		guard let manager = textView.layoutManager, let container = textView.textContainer else {
+			return nil
+		}
+
+		manager.ensureLayout(for: container)
+
+		let text = textView.string as NSString
+		let location = min(textView.selectedRange().location, text.length)
+		let rect: NSRect
+
+		if text.length == 0 {
+			rect = NSRect(x: 0, y: 0, width: 1, height: LineStyle.lineHeight)
+		} else if location >= text.length, manager.extraLineFragmentTextContainer != nil {
+			rect = manager.extraLineFragmentRect            // the empty line at the end
+		} else {
+			let glyph = manager.glyphIndexForCharacter(at: min(location, text.length - 1))
+			rect = manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+		}
+
+		return convert(rect, from: textView)
 	}
 
 	override func layout() {
@@ -365,7 +412,10 @@ struct SheetTextView: UIViewRepresentable {
 			view.selectedRange = selected
 
 			parent.text = view.text
-			(view.superview as? SheetEditorView)?.results.setNeedsDisplay()
+
+			let editor = view.superview as? SheetEditorView
+			editor?.results.setNeedsDisplay()
+			editor?.revealCaret()
 		}
 	}
 }
@@ -410,6 +460,53 @@ final class SheetEditorView: UIView {
 		let fitting = textView.sizeThatFits(
 			CGSize(width: textWidth(in: width), height: .greatestFiniteMagnitude))
 		return max(fitting.height, LineStyle.lineHeight)
+	}
+
+	/// Brings the caret back into sight.
+	///
+	/// The text view does not scroll: it is laid out at its full height and
+	/// SwiftUI's scroll view is what moves. So the usual reveal, on the keypress
+	/// itself, is too early — the sheet is still the height it was, and a return
+	/// typed at the bottom of a full screen puts the new line past the end of
+	/// the scrolled content, behind the total bar. This asks again once the
+	/// sheet has been measured and laid out at its new height.
+	func revealCaret() {
+		DispatchQueue.main.async { [weak self] in
+			guard let self, let window else { return }
+
+			window.layoutIfNeeded()
+
+			var view: UIView? = superview
+			while let next = view, !(next is UIScrollView) { view = next.superview }
+			guard let scroll = view as? UIScrollView, let caret = caretRect() else { return }
+
+			// A line of air, so the caret is never flush against the bar.
+			scroll.scrollRectToVisible(
+				scroll.convert(caret, from: self).insetBy(dx: 0, dy: -LineStyle.lineHeight),
+				animated: false)
+		}
+	}
+
+	/// Where the caret is, in this view's coordinates.
+	private func caretRect() -> CGRect? {
+		guard let manager = textView.layoutManager as NSLayoutManager? else { return nil }
+		let container = textView.textContainer
+		manager.ensureLayout(for: container)
+
+		let text = textView.text as NSString
+		let location = min(textView.selectedRange.location, text.length)
+		let rect: CGRect
+
+		if text.length == 0 {
+			rect = CGRect(x: 0, y: 0, width: 1, height: LineStyle.lineHeight)
+		} else if location >= text.length, manager.extraLineFragmentTextContainer != nil {
+			rect = manager.extraLineFragmentRect            // the empty line at the end
+		} else {
+			let glyph = manager.glyphIndexForCharacter(at: min(location, text.length - 1))
+			rect = manager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+		}
+
+		return convert(rect, from: textView)
 	}
 
 	override func layoutSubviews() {
