@@ -51,8 +51,9 @@ enum Shot {
 
 	/// More than retina. A 460pt panel drawn at 2x is a fifth of a 2880 wide
 	/// store shot and unreadable as a thumbnail, so it is drawn larger and the
-	/// desktop around it is scaled to match.
-	static let scale: CGFloat = 2.75
+	/// desktop around it is scaled to match. `--scale` raises it further for a
+	/// close-up, where the panel is the whole picture.
+	nonisolated(unsafe) static var scale: CGFloat = 2.75
 }
 
 @MainActor
@@ -92,9 +93,16 @@ func render(_ text: String, to url: URL) -> Bool {
 	return true
 }
 
-let arguments = Array(CommandLine.arguments.dropFirst())
+var arguments = Array(CommandLine.arguments.dropFirst())
+
+if let flag = arguments.firstIndex(of: "--scale"), flag + 1 < arguments.count,
+   let value = Double(arguments[flag + 1]) {
+	Shot.scale = CGFloat(value)
+	arguments.removeSubrange(flag...(flag + 1))
+}
+
 guard arguments.count >= 2 else {
-	FileHandle.standardError.write(Data("usage: macshots <out folder> <sheet>…\n".utf8))
+	FileHandle.standardError.write(Data("usage: macshots [--scale n] <out folder> <sheet>…\n".utf8))
 	exit(2)
 }
 

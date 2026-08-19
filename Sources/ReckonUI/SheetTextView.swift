@@ -167,7 +167,7 @@ struct SheetTextView: NSViewRepresentable {
 		let view = SheetEditorView()
 		view.columnWidth = columnWidth
 		view.textView.delegate = context.coordinator
-		view.textView.textStorage?.setAttributedString(LineStyle.attributed(text))
+		view.show(text)
 		return view
 	}
 
@@ -181,12 +181,7 @@ struct SheetTextView: NSViewRepresentable {
 		context.coordinator.parent = self
 		view.columnWidth = columnWidth
 
-		if view.textView.string != text {
-			let selected = view.textView.selectedRange()
-			view.textView.textStorage?.setAttributedString(LineStyle.attributed(text))
-			view.textView.setSelectedRange(
-				NSRange(location: min(selected.location, (text as NSString).length), length: 0))
-		}
+		if view.textView.string != text { view.show(text) }
 
 		if view.results.results != results {
 			view.results.results = results
@@ -224,6 +219,8 @@ final class SheetEditorView: NSView {
 
 	var columnWidth: CGFloat = 132 { didSet { needsLayout = true } }
 	private let gap: CGFloat = 12
+	/// A caret to bring into sight once this view has a window to do it in.
+	private var caretIsWaiting = false
 
 	override init(frame: NSRect) {
 		super.init(frame: frame)
@@ -270,6 +267,16 @@ final class SheetEditorView: NSView {
 		return max(manager.usedRect(for: container).height, LineStyle.lineHeight)
 	}
 
+	/// Puts a sheet on screen: a different one opened, or this one changed on
+	/// disk. Either way the text arrived from outside rather than being typed
+	/// here, so the caret goes where you would carry on from — the end of the
+	/// last line — instead of wherever it happened to be in the sheet before.
+	func show(_ text: String) {
+		textView.textStorage?.setAttributedString(LineStyle.attributed(text))
+		textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+		revealCaret()
+	}
+
 	/// Brings the caret back into sight.
 	///
 	/// The text view does not scroll: it is laid out at its full height and
@@ -279,15 +286,23 @@ final class SheetEditorView: NSView {
 	/// end of the scrolled content, behind the total bar. This asks again once
 	/// the sheet has been measured and laid out at its new height.
 	func revealCaret() {
-		DispatchQueue.main.async { [weak self] in
-			guard let self, let window else { return }
+		DispatchQueue.main.async { [weak self] in self?.showCaret() }
+	}
 
-			window.layoutIfNeeded()
-			guard let caret = caretRect() else { return }
-
-			// A line of air, so the caret is never flush against the bar.
-			scrollToVisible(caret.insetBy(dx: 0, dy: -LineStyle.lineHeight))
+	private func showCaret() {
+		// A sheet opened before its window is on screen — the panel's, every
+		// time it is put together — has nothing to scroll yet, so the ask is
+		// kept until there is.
+		guard let window else {
+			caretIsWaiting = true
+			return
 		}
+
+		window.layoutIfNeeded()
+		guard let caret = caretRect() else { return }
+
+		// A line of air, so the caret is never flush against the bar.
+		scrollToVisible(caret.insetBy(dx: 0, dy: -LineStyle.lineHeight))
 	}
 
 	/// Where the caret is, in this view's coordinates.
@@ -323,6 +338,11 @@ final class SheetEditorView: NSView {
 
 		results.frame = NSRect(x: width + gap, y: 0, width: columnWidth, height: bounds.height)
 		results.needsDisplay = true
+
+		if caretIsWaiting, window != nil {
+			caretIsWaiting = false
+			revealCaret()      // after this layout, not during it
+		}
 	}
 }
 
@@ -372,7 +392,7 @@ struct SheetTextView: UIViewRepresentable {
 		let view = SheetEditorView()
 		view.columnWidth = columnWidth
 		view.textView.delegate = context.coordinator
-		view.textView.attributedText = LineStyle.attributed(text)
+		view.show(text)
 		return view
 	}
 
@@ -386,12 +406,7 @@ struct SheetTextView: UIViewRepresentable {
 		context.coordinator.parent = self
 		view.columnWidth = columnWidth
 
-		if view.textView.text != text {
-			let selected = view.textView.selectedRange
-			view.textView.attributedText = LineStyle.attributed(text)
-			view.textView.selectedRange = NSRange(
-				location: min(selected.location, (text as NSString).length), length: 0)
-		}
+		if view.textView.text != text { view.show(text) }
 
 		if view.results.results != results {
 			view.results.results = results
@@ -429,6 +444,8 @@ final class SheetEditorView: UIView {
 
 	var columnWidth: CGFloat = 132 { didSet { setNeedsLayout() } }
 	private let gap: CGFloat = 12
+	/// A caret to bring into sight once this view is on screen.
+	private var caretIsWaiting = false
 
 	override init(frame: CGRect) {
 		super.init(frame: frame)
@@ -462,6 +479,16 @@ final class SheetEditorView: UIView {
 		return max(fitting.height, LineStyle.lineHeight)
 	}
 
+	/// Puts a sheet on screen: a different one opened, or this one changed on
+	/// disk. Either way the text arrived from outside rather than being typed
+	/// here, so the caret goes where you would carry on from — the end of the
+	/// last line — instead of wherever it happened to be in the sheet before.
+	func show(_ text: String) {
+		textView.attributedText = LineStyle.attributed(text)
+		textView.selectedRange = NSRange(location: (text as NSString).length, length: 0)
+		revealCaret()
+	}
+
 	/// Brings the caret back into sight.
 	///
 	/// The text view does not scroll: it is laid out at its full height and
@@ -471,20 +498,27 @@ final class SheetEditorView: UIView {
 	/// the scrolled content, behind the total bar. This asks again once the
 	/// sheet has been measured and laid out at its new height.
 	func revealCaret() {
-		DispatchQueue.main.async { [weak self] in
-			guard let self, let window else { return }
+		DispatchQueue.main.async { [weak self] in self?.showCaret() }
+	}
 
-			window.layoutIfNeeded()
-
-			var view: UIView? = superview
-			while let next = view, !(next is UIScrollView) { view = next.superview }
-			guard let scroll = view as? UIScrollView, let caret = caretRect() else { return }
-
-			// A line of air, so the caret is never flush against the bar.
-			scroll.scrollRectToVisible(
-				scroll.convert(caret, from: self).insetBy(dx: 0, dy: -LineStyle.lineHeight),
-				animated: false)
+	private func showCaret() {
+		// A sheet opened before its view is on screen has nothing to scroll
+		// yet, so the ask is kept until there is.
+		guard let window else {
+			caretIsWaiting = true
+			return
 		}
+
+		window.layoutIfNeeded()
+
+		var view: UIView? = superview
+		while let next = view, !(next is UIScrollView) { view = next.superview }
+		guard let scroll = view as? UIScrollView, let caret = caretRect() else { return }
+
+		// A line of air, so the caret is never flush against the bar.
+		scroll.scrollRectToVisible(
+			scroll.convert(caret, from: self).insetBy(dx: 0, dy: -LineStyle.lineHeight),
+			animated: false)
 	}
 
 	/// Where the caret is, in this view's coordinates.
@@ -516,6 +550,11 @@ final class SheetEditorView: UIView {
 		textView.frame = CGRect(x: 0, y: 0, width: width, height: bounds.height)
 		results.frame = CGRect(x: width + gap, y: 0, width: columnWidth, height: bounds.height)
 		results.setNeedsDisplay()
+
+		if caretIsWaiting, window != nil {
+			caretIsWaiting = false
+			revealCaret()      // after this layout, not during it
+		}
 	}
 }
 

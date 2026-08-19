@@ -18,15 +18,17 @@ import ImageIO
 import UniformTypeIdentifiers
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-guard arguments.count == 3 else {
+guard arguments.count == 3 || arguments.count == 4 else {
 	FileHandle.standardError.write(Data(
-		"usage: make-mac-mockups.swift <panels> <screenshots out> <mockups out>\n".utf8))
+		"usage: make-mac-mockups.swift <panels> <screenshots out> <mockups out> [closeups]\n".utf8))
 	exit(2)
 }
 
 let panels = URL(fileURLWithPath: arguments[0])
 let flatOut = URL(fileURLWithPath: arguments[1])
 let framedOut = URL(fileURLWithPath: arguments[2])
+/// Panels drawn larger, to be shown on their own rather than in a laptop.
+let closeupsIn = arguments.count == 4 ? URL(fileURLWithPath: arguments[3]) : nil
 
 for folder in [flatOut, framedOut] {
 	try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -117,7 +119,9 @@ let headlines: [String: (String, String)] = [
 	"07-renovation":      ("Write it the way\nyou would say it",
 						   "Commas, slashes and sizes in the description. The number still comes out."),
 	"08-freelance-week":  ("Hours times rate,\nday by day",
-						   "A word in the middle of a sum does not stop it.")
+						   "A word in the middle of a sum does not stop it."),
+	"09-what-it-does":    ("Everything it does,\non one sheet",
+						   "Arithmetic, percentages, functions, names, currencies, and a note anywhere you like.")
 ]
 
 // MARK: - The pieces of a desktop
@@ -300,6 +304,58 @@ func laptop(around screenshot: CGImage, titled headline: (String, String)?) -> C
 	return context.makeImage()
 }
 
+/// The panel on its own, big enough to read every line.
+///
+/// No laptop: a close-up is for showing what the app can do, and a frame
+/// around it only makes the thing being shown smaller.
+func closeup(with panel: CGImage, titled headline: (String, String)?) -> CGImage? {
+	guard let context = newContext(width: canvasWidth, height: canvasHeight) else { return nil }
+	let canvas = CGRect(x: 0, y: 0, width: CGFloat(canvasWidth), height: CGFloat(canvasHeight))
+	let scale = CGFloat(panel.width) / panelPoints
+
+	if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+								 colors: [top, bottom] as CFArray, locations: [0, 1]) {
+		context.drawLinearGradient(gradient,
+								   start: CGPoint(x: 0, y: canvas.maxY),
+								   end: CGPoint(x: canvas.maxX, y: 0), options: [])
+	}
+
+	let side = CGFloat(panel.width)
+	let panelRect = CGRect(x: canvas.maxX - side - 150,
+						   y: canvas.midY - side / 2,
+						   width: side, height: side)
+	let corner: CGFloat = 11 * scale
+
+	if let headline {
+		let column = CGRect(x: 150, y: canvas.midY - 260, width: 1000, height: 400)
+		draw(headline.0, in: column, size: 96, weight: .bold,
+			 colour: .white, lineHeight: 1.06, context: context)
+
+		draw(headline.1, in: CGRect(x: column.minX, y: column.minY - 300, width: 980, height: 300),
+			 size: 44, weight: .regular,
+			 colour: NSColor(white: 1, alpha: 0.86), lineHeight: 1.28, context: context)
+	}
+
+	context.saveGState()
+	context.setShadow(offset: CGSize(width: 0, height: -10 * scale),
+					  blur: 44 * scale,
+					  color: CGColor(gray: 0, alpha: 0.45))
+	context.setFillColor(CGColor(gray: 0.02, alpha: 0.62))
+	context.addPath(CGPath(roundedRect: panelRect, cornerWidth: corner,
+						   cornerHeight: corner, transform: nil))
+	context.fillPath()
+	context.restoreGState()
+
+	context.saveGState()
+	context.addPath(CGPath(roundedRect: panelRect, cornerWidth: corner,
+						   cornerHeight: corner, transform: nil))
+	context.clip()
+	context.draw(panel, in: panelRect)
+	context.restoreGState()
+
+	return context.makeImage()
+}
+
 // MARK: - Run
 
 let sheets = ((try? FileManager.default.contentsOfDirectory(
@@ -322,7 +378,14 @@ for panel in sheets {
 	_ = write(flat, to: flatOut.appendingPathComponent(name))
 
 	let key = panel.deletingPathExtension().lastPathComponent
-	if let framed = laptop(around: flat, titled: headlines[key]) {
+
+	// A sheet with a close-up drawn for it gets that instead of the laptop:
+	// it is there to be read, and a frame would only shrink it.
+	if let big = closeupsIn.flatMap({ load($0.appendingPathComponent(name)) }) {
+		if let shown = closeup(with: big, titled: headlines[key]) {
+			_ = write(shown, to: framedOut.appendingPathComponent(name))
+		}
+	} else if let framed = laptop(around: flat, titled: headlines[key]) {
 		_ = write(framed, to: framedOut.appendingPathComponent(name))
 	}
 

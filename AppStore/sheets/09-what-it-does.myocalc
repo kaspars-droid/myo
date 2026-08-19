@@ -1,0 +1,13 @@
+# What Myo Calc does
+
+2 + 3 * 4        # precedence
+14x100           # x multiplies
+2^10             # powers
+20% of 300       # percentages
+1200 + 15%       # percent of it
+sqrt(144)        # sqrt round min
+rate = 0.21      # a name
+1850 * rate      # and using it
+35eur oil change # a note beside
+oil change 35eur # or in front
+200 plaster, buckets, cable
