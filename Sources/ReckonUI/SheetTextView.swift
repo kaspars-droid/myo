@@ -16,8 +16,28 @@ typealias PlatformView = UIView
 // MARK: - Styling
 
 enum LineStyle {
+	/// The face a sheet is written in.
+	///
+	/// Not the monospaced system font, which draws a caron as a hairline that
+	/// never takes a whole pixel at this size: in a sheet written in Latvian
+	/// the top half of every š, ž and č comes out greyer than the letter under
+	/// it, as though the accent were a shade of the text rather than part of
+	/// it. Raising the size or the weight does not fix it — the mark stays
+	/// thin at every size the app would use.
+	///
+	/// Menlo draws the mark at the weight of the letter it belongs to, ships
+	/// with both macOS and iOS so the two apps stay in step, and is close
+	/// enough in proportion that nothing else about the sheet moves.
 	static var font: PlatformFont {
-		.monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .regular)
+		named("Menlo-Regular")
+			?? .monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .regular)
+	}
+
+	/// A system font is asked for by weight and a bundled one by name, so the
+	/// fallback is what keeps the sheet readable on a machine without Menlo
+	/// rather than a face nobody chose.
+	private static func named(_ name: String) -> PlatformFont? {
+		PlatformFont(name: name, size: PlatformFont.systemFontSize)
 	}
 
 	/// Air between the lines. A sheet is a list to read down, not a paragraph.
@@ -37,9 +57,11 @@ enum LineStyle {
 		return style
 	}
 
-	/// Results are the same size as the sheet, a little heavier.
+	/// Results are the same size as the sheet, a little heavier. Menlo has no
+	/// medium, so the step up is to its bold.
 	static var resultFont: PlatformFont {
-		.monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .medium)
+		named("Menlo-Bold")
+			?? .monospacedSystemFont(ofSize: PlatformFont.systemFontSize, weight: .medium)
 	}
 
 	/// How wide a result column has to be to hold these values.
