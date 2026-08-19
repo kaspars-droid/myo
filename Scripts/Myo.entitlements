@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The App Store will not take a Mac app without this. Everything else
+	     here is a hole punched back through it for something the app has to
+	     be able to do. -->
+	<key>com.apple.security.app-sandbox</key><true/>
+
+	<!-- The sheet folder is chosen by hand through an NSOpenPanel, and the
+	     panel is what grants access to it. -->
+	<key>com.apple.security.files.user-selected.read-write</key><true/>
+
+	<!-- That grant lasts until the app quits. The folder is meant to be
+	     chosen once and remembered, so the choice is kept as a bookmark that
+	     survives a relaunch rather than as a path, which would not. -->
+	<key>com.apple.security.files.bookmarks.app-scope</key><true/>
+</dict>
+</plist>

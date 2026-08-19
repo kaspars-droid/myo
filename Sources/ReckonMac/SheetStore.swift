@@ -41,9 +41,9 @@ final class SheetStore: ObservableObject {
 	private var saveWork: Task<Void, Never>?
 	private var renameWork: Task<Void, Never>?
 	private let watcher = FolderWatcher()
+	private let access = FolderAccess()
 
 	private static let lastSheetKey = "lastSheet"
-	private static let folderKey = "sheetFolder"
 	/// Sheets are `.myocalc` files. Nothing else is listed. The engine already
 	/// says which extension that is, and two answers to one question is one
 	/// too many.
@@ -64,9 +64,9 @@ final class SheetStore: ObservableObject {
 	func start() {
 		guard url == nil else { return }
 
-		if let saved = UserDefaults.standard.string(forKey: Self.folderKey) {
-			folder = URL(fileURLWithPath: saved)
-		}
+		// Before the remembered sheet is looked for, because sandboxed the
+		// folder is what makes the sheet inside it readable at all.
+		folder = access.restore()
 		refreshEntries()
 
 		let remembered = UserDefaults.standard.string(forKey: Self.lastSheetKey)
@@ -167,7 +167,7 @@ final class SheetStore: ObservableObject {
 		leaveCurrentSheet()
 
 		folder = chosen
-		UserDefaults.standard.set(chosen.path, forKey: Self.folderKey)
+		access.adopt(chosen)
 		refreshEntries()
 		watcher.watch(folder: folder, file: url)
 
