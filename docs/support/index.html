@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support — Myo Calc</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #16181d;
+    --muted: #5c6270;
+    --rule: #e3e5ea;
+    --accent: #2f6df6;
+    --panel: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --fg: #e6e8ec; --muted: #9aa1ae; --rule: #2a2e36; --accent: #7fa6ff; --panel: #1b1e24; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 40rem; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 0 0 1.5rem; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 1.05rem; margin: 2.75rem 0 0.75rem; letter-spacing: -0.01em;
+    padding-top: 1.5rem; border-top: 1px solid var(--rule);
+  }
+  h1 + p { color: var(--muted); font-size: 0.95rem; }
+  p { margin: 0 0 1rem; }
+  ul { margin: 0 0 1rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.4rem; }
+  code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: rgba(127, 127, 127, 0.15);
+    padding: 0.1em 0.35em; border-radius: 4px;
+  }
+  a { color: var(--accent); overflow-wrap: anywhere; }
+
+  .contact {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+    margin: 0 0 1rem;
+  }
+  .contact p { margin: 0; }
+  .contact p + p { margin-top: 0.5rem; }
+
+  .scroll { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+  th, td { text-align: left; padding: 0.5rem 0.9rem 0.5rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+  td:first-child, td:nth-child(2) { font-family: ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; }
+  td:nth-child(2) { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Myo Calc — Support</h1>
+<p>For Myo Calc 1.2 on iPhone, iPad and Mac.</p>
+
+<p>Myo Calc is a line based calculator: you write on the left, the answers appear
+on the right, and the whole thing is a plain text file you own.</p>
+
+<h2>Getting in touch</h2>
+
+<div class="contact">
+  <p><strong>Email:</strong> <a href="mailto:kaspars@cirsis.lv">kaspars@cirsis.lv</a></p>
+  <p><strong>Bugs and requests:</strong> <a href="https://github.com/kaspars-droid/myo/issues">github.com/kaspars-droid/myo/issues</a></p>
+</div>
+
+<p>Myo Calc is made by one person, so an answer may take a few days rather than a
+few minutes. If something is wrong, the useful things to say are: which device
+and which version of iOS or macOS, what you typed, what appeared beside it, and
+what you expected instead. A sheet is plain text, so pasting the lines
+themselves into the message is usually the fastest way to show the problem.</p>
+
+<h2>What you can write in a sheet</h2>
+
+<p>Everything the calculator understands, and what it gives back:</p>
+
+<div class="scroll">
+<table>
+<thead><tr><th>You write</th><th>You get</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td>2 + 3 * 4</td><td>14</td><td>Times before plus, as in ordinary arithmetic</td></tr>
+<tr><td>(2 + 3) * 4</td><td>20</td><td>Brackets first</td></tr>
+<tr><td>7 / 2</td><td>3.5</td><td>Divide. <code>÷</code> works too</td></tr>
+<tr><td>14x100</td><td>1 400</td><td>Multiply. <code>x</code> and <code>×</code> both work</td></tr>
+<tr><td>2^10</td><td>1 024</td><td>Raise to a power</td></tr>
+<tr><td>20% of 300</td><td>60</td><td>A share of a figure</td></tr>
+<tr><td>1200 + 15%</td><td>1 380</td><td>Or a percentage added on top</td></tr>
+<tr><td>rate = 0.21</td><td>0.21</td><td>Give a figure a name</td></tr>
+<tr><td>1850 * rate</td><td>388.5</td><td>And use that name lower down</td></tr>
+<tr><td>sqrt(144)</td><td>12</td><td>Square root</td></tr>
+<tr><td>pow(2, 8)</td><td>256</td><td>Any power</td></tr>
+<tr><td>round(2.6)</td><td>3</td><td>To the nearest whole number</td></tr>
+<tr><td>floor(2.6)</td><td>2</td><td>Down to a whole number</td></tr>
+<tr><td>ceil(2.1)</td><td>3</td><td>Up to a whole number</td></tr>
+<tr><td>abs(-30)</td><td>30</td><td>Without the sign</td></tr>
+<tr><td>min(9, 4, 7)</td><td>4</td><td>The smallest of them</td></tr>
+<tr><td>max(9, 4, 7)</td><td>9</td><td>The largest</td></tr>
+<tr><td>log(1000)</td><td>3</td><td>Logarithm base ten</td></tr>
+<tr><td>ln(1)</td><td>0</td><td>Natural logarithm</td></tr>
+<tr><td>35eur oil</td><td>€35</td><td>A currency sticks to the figure; the note needs no hash</td></tr>
+<tr><td># a note</td><td></td><td>Anything after a hash is ignored by the calculator</td></tr>
+<tr><td>total</td><td>€92.50</td><td>Adds the amounts written since the last blank line. <code>sum</code> does the same</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The first line names the sheet, which is why it is also the file's name. The
+bar along the bottom totals the whole sheet, and each currency is totalled on
+its own, since the app holds no exchange rates and will not invent one.</p>
+
+<p>Answers are written the way your device writes numbers. If your region uses a
+comma for decimals, then you can type <code>12,50</code> as well as
+<code>12.50</code>, and the answers come back in the same style.</p>
+
+<h2>Where your sheets are kept</h2>
+
+<p>A sheet is a plain text file ending in <code>.myocalc</code>. It opens in any
+text editor and stays readable without this app, which is the point of it.</p>
+
+<p>The app keeps its sheets in a folder you choose. Until you choose one, it keeps
+them privately inside the app on the device. On iPhone and iPad the app also
+holds its own copy of that folder so sheets open instantly and still work with
+no signal.</p>
+
+<h2>The same sheets on more than one device</h2>
+
+<p>Point each device at the same folder in a service that syncs — iCloud Drive,
+Dropbox, Google Drive, or anything else that appears as a folder. The app
+writes ordinary files, so the sync is the service's job rather than the app's.</p>
+
+<p>One thing to know before you rely on it: there is no merging. If the same
+sheet is edited on two devices at once, the last write wins and the other
+version is gone. Editing one sheet in one place at a time is safe; editing it in
+two places at once is not.</p>
+
+<h2>If something looks wrong</h2>
+
+<ul>
+  <li><strong>A line has no answer.</strong> The app leaves a line alone when it
+      cannot read it as a sum, so prose stays prose. Check for a stray word
+      inside the figures.</li>
+  <li><strong>The total looks too small.</strong> <code>total</code> only adds
+      what was written since the last blank line, and a named figure such as
+      <code>rate = 0.21</code> is deliberately kept out of the totals.</li>
+  <li><strong>A sheet is missing.</strong> Look in the folder itself with Files
+      or Finder. The sheets are ordinary files, so if they are there, they are
+      not lost, whatever the app is showing.</li>
+  <li><strong>A cloud sheet did not arrive.</strong> Open the folder in the
+      service's own app first and let it download, then reopen Myo Calc.</li>
+</ul>
+
+<h2>What you need to run it</h2>
+
+<ul>
+  <li>iPhone and iPad: iOS or iPadOS 26.5 or later.</li>
+  <li>Mac: macOS 15 or later.</li>
+</ul>
+
+<h2>Privacy</h2>
+
+<p>Myo Calc collects nothing, has no accounts and makes no network connections.
+The full statement is at
+<a href="https://kaspars-droid.github.io/myo/privacy/">kaspars-droid.github.io/myo/privacy/</a>.</p>
+
+</main>
+</body>
+</html>
