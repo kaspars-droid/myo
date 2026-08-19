@@ -86,22 +86,52 @@ net * rate
 2 + 3 * 4            precedence, parentheses, ^ (right associative)
 0.1 + 0.2            decimal arithmetic, so money adds up exactly
 10 ÷ 4               typographic operators too
+16 589,94            thousands split by a space, where that is how you write
 
 20% of 300           percentages
 120 + 10%            percent of the left hand side
 sqrt(16)             sqrt abs round floor ceil min max pow log ln
-
-rate = 0.21          a name for a number
-1850 * rate          and using it
 ```
 
-No line refers to another. There was a `sum`, a `total`, an `avg`, a `prev` and
-a `line 2`, and each of them needed a rule about where a block began before it
-could be trusted — a blank line ended one, a subtotal ended one, a definition
-ended one. That is a lot to know in a window you open to add up a receipt, and
-the bar along the bottom already answers the question all of it was for.
+## Names
 
-They are ordinary words now, free to be used as names.
+A figure worth referring to gets a name, and the name is drawn in green
+wherever it appears — where it is given and everywhere it is read — so the
+handful of lines a sheet actually hangs on can be picked out at a glance.
+
+```
+jumta_segums = 16 589,94
+ieks_udens = 7 896,75
+tame = jumta_segums + melna_grida + ieks_udens
+```
+
+A name can be several words (`car repair = 350`), and reading one is what makes
+the line an amount rather than prose. Defining one is not spending it, so a
+sheet that opens by declaring a rate does not have that rate added into the bar
+along the bottom.
+
+### `total`
+
+`total` is the figures written above it, added up. A blank line is where one
+group ends and the next begins; a name, or another `total`, closes the group it
+has just claimed, so nothing is ever counted into two subtotals.
+
+```
+Melnās grīdas izbūve         a heading does not break the group
+Grīdu siltināšana 6 251,90 €
+Tvaika barjeras 446,82 €
+Melnās grīdas betonēšana 3 050,20 €
+melna_grida = total          € 9 748,92
+```
+
+`sum` says the same thing. Neither is reserved: a sheet that defines `total` as
+a name of its own means the name.
+
+Both are words people write in sheets, so they only mean the subtotal when the
+line is nothing else — `Total materials` and `total costs so far` stay the
+headings they look like, and a `total` with nothing above it is prose. The line
+itself never goes into the bar along the bottom, because the figures it was
+made from are already there.
 
 ## Figures with words beside them
 

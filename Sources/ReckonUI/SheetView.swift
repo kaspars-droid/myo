@@ -32,7 +32,8 @@ public struct SheetView: View {
 				// which is the only way a result stays level with its line.
 				SheetTextView(text: textBinding,
 							  results: results.map(\.formatted),
-							  columnWidth: resultColumn)
+							  columnWidth: resultColumn,
+							  sheet: sheet)
 					.frame(maxWidth: .infinity, alignment: .topLeading)
 					.padding(20)
 			}
@@ -98,7 +99,7 @@ public struct SheetView: View {
 	35eur           # oil
 	45eur           # filter
 	12.50eur
-	sum
+	total           # the amounts since the last blank line
 
 	120 + 10%
 	"""

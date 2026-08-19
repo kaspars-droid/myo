@@ -58,10 +58,18 @@ enum LineStyle {
 		[.font: font, .foregroundColor: PlatformColor.sheetText, .paragraphStyle: paragraph]
 	}
 
-	/// Colours every comment in the sheet, so a note reads differently from
-	/// the arithmetic beside it.
-	static func attributed(_ text: String) -> NSAttributedString {
+	/// Colours the sheet: notes in orange, and the names a sheet gives its
+	/// figures in green, both where a name is defined and everywhere it is
+	/// read. A name is the one word on a line that means something elsewhere
+	/// in the sheet, so it is worth being able to pick out at a glance.
+	static func attributed(_ text: String, sheet: Sheet) -> NSAttributedString {
 		let result = NSMutableAttributedString(string: text, attributes: typing)
+		let length = (text as NSString).length
+
+		for span in sheet.names(in: text) where NSMaxRange(span.range) <= length {
+			result.addAttribute(.foregroundColor, value: PlatformColor.nameColour,
+								range: span.range)
+		}
 
 		var start = 0
 		for line in text.components(separatedBy: "\n") {
@@ -89,6 +97,17 @@ extension PlatformColor {
 		NSColor(srgbRed: 0.95, green: 0.71, blue: 0.13, alpha: 1)
 #else
 		UIColor(red: 0.95, green: 0.71, blue: 0.13, alpha: 1)
+#endif
+	}
+
+	/// Green. The results down the right are blue, so a name has to be its own
+	/// colour rather than theirs: a name and the figure it stands for are two
+	/// different things and sit in two different columns.
+	static var nameColour: PlatformColor {
+#if os(macOS)
+		NSColor(srgbRed: 0.30, green: 0.66, blue: 0.36, alpha: 1)
+#else
+		UIColor(red: 0.30, green: 0.66, blue: 0.36, alpha: 1)
 #endif
 	}
 
@@ -160,12 +179,16 @@ struct SheetTextView: NSViewRepresentable {
 	/// One per logical line, already formatted, nil where a line has no value.
 	var results: [String?]
 	var columnWidth: CGFloat
+	/// The same engine the results came from, so the colouring agrees with
+	/// them about which words are names.
+	var sheet: Sheet
 
 	func makeCoordinator() -> Coordinator { Coordinator(self) }
 
 	func makeNSView(context: Context) -> SheetEditorView {
 		let view = SheetEditorView()
 		view.columnWidth = columnWidth
+		view.sheet = sheet
 		view.textView.delegate = context.coordinator
 		view.show(text)
 		return view
@@ -180,6 +203,7 @@ struct SheetTextView: NSViewRepresentable {
 	func updateNSView(_ view: SheetEditorView, context: Context) {
 		context.coordinator.parent = self
 		view.columnWidth = columnWidth
+		view.sheet = sheet
 
 		if view.textView.string != text { view.show(text) }
 
@@ -200,7 +224,8 @@ struct SheetTextView: NSViewRepresentable {
 			// Typing loses the colouring, so it goes straight back on with the
 			// selection where it was.
 			let selected = view.selectedRange()
-			view.textStorage?.setAttributedString(LineStyle.attributed(view.string))
+			view.textStorage?.setAttributedString(
+				LineStyle.attributed(view.string, sheet: parent.sheet))
 			view.setSelectedRange(selected)
 
 			parent.text = view.string
@@ -217,6 +242,7 @@ final class SheetEditorView: NSView {
 	let textView = NSTextView()
 	let results = ResultsView()
 
+	var sheet = Sheet()
 	var columnWidth: CGFloat = 132 { didSet { needsLayout = true } }
 	private let gap: CGFloat = 12
 	/// A caret to bring into sight once this view has a window to do it in.
@@ -272,7 +298,7 @@ final class SheetEditorView: NSView {
 	/// here, so the caret goes where you would carry on from — the end of the
 	/// last line — instead of wherever it happened to be in the sheet before.
 	func show(_ text: String) {
-		textView.textStorage?.setAttributedString(LineStyle.attributed(text))
+		textView.textStorage?.setAttributedString(LineStyle.attributed(text, sheet: sheet))
 		textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
 		revealCaret()
 	}
@@ -385,12 +411,16 @@ struct SheetTextView: UIViewRepresentable {
 	/// One per logical line, already formatted, nil where a line has no value.
 	var results: [String?]
 	var columnWidth: CGFloat
+	/// The same engine the results came from, so the colouring agrees with
+	/// them about which words are names.
+	var sheet: Sheet
 
 	func makeCoordinator() -> Coordinator { Coordinator(self) }
 
 	func makeUIView(context: Context) -> SheetEditorView {
 		let view = SheetEditorView()
 		view.columnWidth = columnWidth
+		view.sheet = sheet
 		view.textView.delegate = context.coordinator
 		view.show(text)
 		return view
@@ -405,6 +435,7 @@ struct SheetTextView: UIViewRepresentable {
 	func updateUIView(_ view: SheetEditorView, context: Context) {
 		context.coordinator.parent = self
 		view.columnWidth = columnWidth
+		view.sheet = sheet
 
 		if view.textView.text != text { view.show(text) }
 
@@ -423,7 +454,7 @@ struct SheetTextView: UIViewRepresentable {
 			// Typing loses the colouring, so it goes straight back on with the
 			// selection where it was.
 			let selected = view.selectedRange
-			view.attributedText = LineStyle.attributed(view.text)
+			view.attributedText = LineStyle.attributed(view.text, sheet: parent.sheet)
 			view.selectedRange = selected
 
 			parent.text = view.text
@@ -442,6 +473,7 @@ final class SheetEditorView: UIView {
 	let textView = UITextView(usingTextLayoutManager: false)
 	let results = ResultsView()
 
+	var sheet = Sheet()
 	var columnWidth: CGFloat = 132 { didSet { setNeedsLayout() } }
 	private let gap: CGFloat = 12
 	/// A caret to bring into sight once this view is on screen.
@@ -484,7 +516,7 @@ final class SheetEditorView: UIView {
 	/// here, so the caret goes where you would carry on from — the end of the
 	/// last line — instead of wherever it happened to be in the sheet before.
 	func show(_ text: String) {
-		textView.attributedText = LineStyle.attributed(text)
+		textView.attributedText = LineStyle.attributed(text, sheet: sheet)
 		textView.selectedRange = NSRange(location: (text as NSString).length, length: 0)
 		revealCaret()
 	}

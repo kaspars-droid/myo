@@ -699,6 +699,244 @@ final class FormattingTests: XCTestCase {
 	}
 }
 
+// MARK: - Variables
+
+/// Names, the subtotal that fills them in, and the figures they are written
+/// from. A sheet of building work is a stack of small columns, each with a
+/// heading and a name for what it came to, and this is what makes that
+/// readable without repeating a column of figures further down.
+final class VariableTests: XCTestCase {
+	private let sheet = Sheet()
+
+	private func values(_ source: String) -> [String?] {
+		sheet.evaluate(source).map(\.formatted)
+	}
+
+	func testTotalAddsTheBlockAboveIt() {
+		let lines = sheet.evaluate("""
+		Melnās grīdas izbūve
+		6251.90
+		446.82
+		3050.20
+		floor = total
+		""")
+
+		XCTAssertEqual(lines[4].kind, .assignment("floor"))
+		XCTAssertEqual(lines[4].formatted, "9,748.92")
+	}
+
+	/// The heading a group is written under does not break it, and neither
+	/// does a note. Only a blank line does.
+	func testABlankLineEndsTheBlock() {
+		XCTAssertEqual(values("""
+		roof
+		10
+		20
+
+		floor       # a heading, and a note
+		30
+		40
+		total
+		""").last!, "70")
+	}
+
+	/// Otherwise the second subtotal would add the first one's figures again.
+	func testASubtotalEndsTheBlockItAddedUp() {
+		let lines = sheet.evaluate("""
+		10
+		20
+		total
+		30
+		total
+		""")
+
+		XCTAssertEqual(lines[2].formatted, "30")
+		XCTAssertEqual(lines[4].formatted, "30")
+	}
+
+	func testNamingAFigureEndsTheBlock() {
+		let lines = sheet.evaluate("""
+		10
+		20
+		first = total
+		30
+		second = total
+		""")
+
+		XCTAssertEqual(lines[2].formatted, "30")
+		XCTAssertEqual(lines[4].formatted, "30")
+	}
+
+	func testASubtotalIsNotAddedToTheFiguresItCameFrom() {
+		let source = """
+		10
+		20
+		total
+		"""
+		XCTAssertEqual(sheet.grandTotal(of: sheet.evaluate(source)).map { sheet.format($0) },
+					   ["30"])
+	}
+
+	func testTotalKeepsTheCurrency() {
+		XCTAssertEqual(values("""
+		35eur
+		45eur
+		total
+		""").last!, "€80")
+	}
+
+	/// `total` is a word people write in sheets. It only means the subtotal
+	/// when it is the whole line, so a heading stays a heading.
+	func testTotalInProseIsStillProse() {
+		let lines = sheet.evaluate("""
+		10
+		20
+		Total materials
+		total costs so far
+		Grand total
+		""")
+
+		for line in lines[2...] {
+			XCTAssertEqual(line.kind, .prose, line.text)
+			XCTAssertNil(line.value, line.text)
+		}
+	}
+
+	/// With nothing above it there is nothing to add up, so the word is
+	/// whatever it was before: prose, or a name of your own.
+	func testTotalWithNothingAboveIt() {
+		XCTAssertEqual(sheet.evaluateOne("total").kind, .prose)
+
+		let lines = sheet.evaluate("""
+		total = 500
+		total / 2
+		""")
+
+		XCTAssertEqual(lines[0].kind, .assignment("total"))
+		XCTAssertEqual(lines[1].formatted, "250")
+	}
+
+	func testASubtotalCanBeUsedInASum() {
+		XCTAssertEqual(values("""
+		10
+		20
+		total * 2
+		""").last!, "60")
+	}
+}
+
+/// Thousands split by a space, which is how most of Europe writes a figure and
+/// how this sheet prints one back into its own result column.
+final class ThousandsTests: XCTestCase {
+	private let sheet = Sheet(locale: Locale(identifier: "lv_LV"))
+
+	private func value(_ text: String) -> String? {
+		sheet.evaluateOne(text).formatted
+	}
+
+	private func amount(_ text: String) -> Decimal? {
+		sheet.evaluateOne(text).value?.amount
+	}
+
+	func testASpaceHoldsAFigureTogether() {
+		XCTAssertEqual(amount("10 000"), 10000)
+		XCTAssertEqual(amount("12 241+10 431"), 22672)
+		XCTAssertEqual(amount("1 234 567 + 1"), 1234568)
+	}
+
+	func testTheDecimalsStillFollow() {
+		XCTAssertEqual(amount("16 589,94"), Decimal(string: "16589.94"))
+	}
+
+	/// The space a formatter writes between thousands is a non-breaking one,
+	/// and a figure copied out of the result column brings it along.
+	func testTheNonBreakingSpaceAFormatterWritesIsReadBackToo() {
+		XCTAssertEqual(amount("1\u{00A0}234\u{00A0}567"), 1234567)
+		XCTAssertEqual(amount("1\u{202F}234"), 1234)
+	}
+
+	/// A space between two things that are not a group of thousands is still
+	/// a space: a label, an operator, a second figure.
+	func testASpaceThatIsNotAThousandsSeparator() {
+		XCTAssertEqual(amount("2 + 3"), 5)
+		XCTAssertEqual(amount("5 apples"), 5)
+		XCTAssertEqual(amount("302 boards + 6 trailer"), 308)
+		XCTAssertEqual(amount("7 mortar 10kg"), 7)
+
+		// Written as thousands this would have been `2 024 500`, so these are
+		// two figures rather than one.
+		XCTAssertEqual(amount("2024 500"), 2024)
+	}
+
+	/// The point of all this: a figure the sheet prints can be typed straight
+	/// back into it and mean the same thing.
+	func testTheAnswerToASubtotalCanBeTypedBackIn() {
+		let sum = sheet.evaluate("6 251,90\n446,82\n3 050,20\ntotal")
+		XCTAssertEqual(sum.last?.value?.amount, Decimal(string: "9748.92"))
+
+		let printed = sum.last!.formatted!
+		XCTAssertEqual(amount(printed), sum.last?.value?.amount)
+		XCTAssertEqual(amount(sheet.format(Quantity(1234567))), 1234567)
+	}
+}
+
+/// Where the names sit, which is all the editor needs to colour them.
+final class NameSpanTests: XCTestCase {
+	private let sheet = Sheet()
+
+	private func names(_ source: String) -> [String] {
+		sheet.names(in: source).map(\.name)
+	}
+
+	func testANameIsFoundWhereItIsDefinedAndWhereItIsRead() {
+		XCTAssertEqual(names("rate = 0.21\n1850 * rate"), ["rate", "rate"])
+		XCTAssertEqual(sheet.names(in: "rate = 0.21\n1850 * rate").map(\.role),
+					   [.defined, .used])
+	}
+
+	/// The ranges are measured against the whole sheet, so a text view can
+	/// colour them without counting lines itself.
+	func testTheRangesLineUpWithTheText() {
+		let source = "jumta_segums = 16589.94\ntame = jumta_segums + 1"
+		let text = source as NSString
+
+		for span in sheet.names(in: source) {
+			XCTAssertEqual(text.substring(with: span.range), span.name)
+		}
+	}
+
+	/// `tame` is written inside `tame_kludaina`, and colouring that half of it
+	/// would look like a mistake.
+	func testANameInsideALongerNameIsNotAMatch() {
+		let source = """
+		tame = 1
+		tame_kludaina = 2
+		tame_kludaina - tame
+		"""
+		let text = source as NSString
+		let spans = sheet.names(in: source).filter { $0.name == "tame" }
+
+		XCTAssertEqual(spans.count, 2)
+		for span in spans { XCTAssertEqual(text.substring(with: span.range), "tame") }
+	}
+
+	func testMultiWordNamesAreOneSpan() {
+		let source = "car repair = 350\ncar repair * 2"
+		let text = source as NSString
+
+		for span in sheet.names(in: source) {
+			XCTAssertEqual(text.substring(with: span.range), "car repair")
+		}
+	}
+
+	/// Prose is not a name, and neither is a comment that happens to mention
+	/// one — the colouring only follows what the arithmetic actually reads.
+	func testProseIsNotColoured() {
+		XCTAssertEqual(names("shopping list\n35eur oil change"), [])
+		XCTAssertEqual(names("rate = 0.21\n5   # rate"), ["rate"])
+	}
+}
+
 final class SheetNameTests: XCTestCase {
 
 	private func name(_ text: String) -> String {

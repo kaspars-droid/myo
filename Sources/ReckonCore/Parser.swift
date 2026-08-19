@@ -8,20 +8,28 @@ struct Parser {
 	private let tokens: [Token]
 	private var index = 0
 	private let knownVariables: Set<String>
+	/// Whether there are amounts above this line for `total` to add up.
+	private let blockIsOpen: Bool
 
-	init(tokens: [Token], knownVariables: Set<String>) {
+	init(tokens: [Token], knownVariables: Set<String>, blockIsOpen: Bool = false) {
 		self.tokens = tokens
 		self.knownVariables = knownVariables
+		self.blockIsOpen = blockIsOpen
 	}
 
 	/// Parses a whole line, which is either `name = expression` or just an
 	/// expression. Returns the assigned name, if any, alongside the tree.
-	static func parseLine(tokens: [Token], knownVariables: Set<String>) -> (name: String?, expr: Expr)? {
+	static func parseLine(tokens: [Token], knownVariables: Set<String>,
+						  blockIsOpen: Bool = false) -> (name: String?, expr: Expr)? {
+		func parser(_ tokens: [Token]) -> Parser {
+			Parser(tokens: tokens, knownVariables: knownVariables, blockIsOpen: blockIsOpen)
+		}
+
 		// `rate = 0.21`
 		if let split = tokens.firstIndex(of: .equals),
 		   let name = variableName(from: Array(tokens[..<split])) {
 			let right = Array(tokens[(split + 1)...])
-			var parser = Parser(tokens: right, knownVariables: knownVariables)
+			var parser = parser(right)
 
 			if !right.isEmpty, let expr = parser.parseExpression(), parser.isAtEnd {
 				return (name, expr)
@@ -34,7 +42,7 @@ struct Parser {
 		// swallow the line.
 		if let split = tokens.firstIndex(of: .equals), split + 1 < tokens.count {
 			let right = Array(tokens[(split + 1)...])
-			var parser = Parser(tokens: right, knownVariables: knownVariables)
+			var parser = parser(right)
 
 			if let expr = parser.parseExpression(), parser.isAtEnd {
 				return (nil, expr)
@@ -43,8 +51,9 @@ struct Parser {
 
 		// Otherwise the line is an amount, possibly with something written
 		// beside it: `35eur oil change`.
-		var parser = Parser(tokens: tokens, knownVariables: knownVariables)
-		if let expr = parser.parseExpression(), parser.trailingIsALabel {
+		var bare = parser(tokens)
+		if let expr = bare.parseExpression(), bare.trailingIsALabel,
+		   !expr.mentionsTotal || bare.nothingLeftButAWrittenAnswer {
 			return (nil, expr)
 		}
 
@@ -54,9 +63,13 @@ struct Parser {
 		let leadingWords = tokens.prefix { if case .word = $0 { return true } else { return false } }
 		guard !leadingWords.isEmpty, leadingWords.count < tokens.count else { return nil }
 
-		var afterLabel = Parser(tokens: Array(tokens[leadingWords.count...]),
-								knownVariables: knownVariables)
+		var afterLabel = parser(Array(tokens[leadingWords.count...]))
 		guard let expr = afterLabel.parseExpression(), afterLabel.trailingIsALabel else { return nil }
+
+		// `total` says nothing about which words around it are a label, so it
+		// only counts when it is the whole line. Otherwise every sheet with a
+		// heading reading `Total materials` would sprout a figure.
+		guard !expr.mentionsTotal else { return nil }
 		return (nil, expr)
 	}
 
@@ -107,6 +120,16 @@ struct Parser {
 	}
 
 	private var isAtEnd: Bool { index >= tokens.count }
+
+	/// Nothing after the arithmetic except, possibly, an answer some other
+	/// calculator wrote onto the end of the line.
+	///
+	/// A label is fine after a figure but not after a `total`, which is a word
+	/// itself: `total materials` would otherwise read as a subtotal with a
+	/// note beside it rather than as the heading it is.
+	private var nothingLeftButAWrittenAnswer: Bool {
+		isAtEnd || tokens[index] == .equals
+	}
 
 	private func peek() -> Token? { index < tokens.count ? tokens[index] : nil }
 
@@ -307,11 +330,47 @@ struct Parser {
 			return .variable(name)
 		}
 
+		// `total`, and `sum` for the same thing, name the amounts written
+		// above. A sheet that has defined one of them as a name means the
+		// name, which is why this comes after the lookup rather than before.
+		if blockIsOpen, lowercased == "total" || lowercased == "sum" {
+			return .total
+		}
+
 		return nil  // an unknown bare word means this line is prose
 	}
 
 	private func tokenAt(_ position: Int) -> Token? {
 		position < tokens.count ? tokens[position] : nil
+	}
+}
+
+extension Expr {
+	/// Whether this line leans on the amounts above it, which is what stops it
+	/// being added into the bar along the bottom a second time.
+	var mentionsTotal: Bool {
+		switch self {
+		case .total:                        return true
+		case .number, .money, .variable:    return false
+		case .percent(let inner),
+			 .unary(_, let inner):          return inner.mentionsTotal
+		case .percentOf(let a, let b),
+			 .binary(_, let a, let b):      return a.mentionsTotal || b.mentionsTotal
+		case .call(_, let arguments):       return arguments.contains(where: \.mentionsTotal)
+		}
+	}
+
+	/// Every name this line reads, in the order they are written.
+	var mentionedNames: [String] {
+		switch self {
+		case .variable(let name):           return [name]
+		case .number, .money, .total:       return []
+		case .percent(let inner),
+			 .unary(_, let inner):          return inner.mentionedNames
+		case .percentOf(let a, let b),
+			 .binary(_, let a, let b):      return a.mentionedNames + b.mentionedNames
+		case .call(_, let arguments):       return arguments.flatMap(\.mentionedNames)
+		}
 	}
 }
 

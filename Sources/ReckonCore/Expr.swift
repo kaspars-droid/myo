@@ -5,6 +5,7 @@ indirect enum Expr: Equatable {
 	case number(Decimal)
 	case money(Decimal, String)     // 35 EUR
 	case variable(String)
+	case total                      // the amounts since the last blank line
 	case percent(Expr)              // 10%
 	case percentOf(Expr, Expr)      // 10% of 200
 	case unary(String, Expr)
@@ -20,6 +21,7 @@ enum EvaluationError: Error, Equatable {
 	case mixedCurrency(String, String)
 	case currencyNotAllowed(String)
 	case divisionByMoney
+	case emptyBlock
 
 	var message: String {
 		switch self {
@@ -33,6 +35,8 @@ enum EvaluationError: Error, Equatable {
 			return "\(operation) does not work on money"
 		case .divisionByMoney:
 			return "Cannot divide a plain number by an amount of money"
+		case .emptyBlock:
+			return "Nothing above this line to total"
 		}
 	}
 }

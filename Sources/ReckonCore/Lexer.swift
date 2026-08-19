@@ -156,22 +156,56 @@ struct Lexer {
 	private mutating func readNumber() -> Decimal? {
 		var text = ""
 		var seenSeparator = false
+		var digitsInGroup = 0
 
 		while index < scalars.count {
 			let character = scalars[index]
 			if character.isNumber {
 				text.append(character)
+				digitsInGroup += 1
 				index += 1
 			} else if isDecimalPoint(character) && !seenSeparator && peekIsNumber(at: index + 1) {
 				seenSeparator = true
 				text.append(".")
 				index += 1
+			} else if !seenSeparator, digitsInGroup <= 3, startsAThousandsGroup(at: index) {
+				text.append(contentsOf: scalars[(index + 1)...(index + 3)])
+				digitsInGroup = 3
+				index += 4
 			} else {
 				break
 			}
 		}
 
 		return Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))
+	}
+
+	/// Whether the space at `position` is holding a number together rather
+	/// than separating two of them: `16 589,94`, `12 241`, `10 000`.
+	///
+	/// A sheet that prints `10 820,24` down its result column has to be able
+	/// to read that figure back, and in most of Europe the thousands are split
+	/// by a space. So a single space counts as part of the number when exactly
+	/// three digits follow it and nothing numeric follows those — which is what
+	/// a group of thousands looks like and what a pair of separate amounts,
+	/// `5 apples`, `2 + 3`, `302 boards`, never does.
+	///
+	/// The digits already read have to be a group's worth too, so `2024 500`
+	/// stays two numbers: written as thousands it would have been `2 024 500`.
+	private func startsAThousandsGroup(at position: Int) -> Bool {
+		guard isGroupSeparator(scalars[position]) else { return false }
+		guard position + 3 < scalars.count else { return false }
+
+		for offset in 1...3 where !scalars[position + offset].isNumber { return false }
+
+		let after = position + 4
+		return after >= scalars.count || !scalars[after].isNumber
+	}
+
+	/// The spaces a number formatter puts between thousands. The narrow and
+	/// non-breaking ones are what `NumberFormatter` actually writes.
+	private func isGroupSeparator(_ character: Character) -> Bool {
+		character == " " || character == "\u{00A0}" || character == "\u{202F}"
 	}
 
 	private mutating func readWord() -> String {

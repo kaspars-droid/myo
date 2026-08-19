@@ -4,6 +4,10 @@ import Foundation
 /// is remembered, because nothing can refer to them.
 struct Context {
 	var variables: [String: Quantity] = [:]
+	/// The amounts written since the last blank line, which is what `total`
+	/// adds up. A definition or a total of its own ends the run, so a subtotal
+	/// is never made from figures another subtotal has already claimed.
+	var block: [Quantity] = []
 }
 
 enum Functions {
@@ -30,6 +34,14 @@ struct Evaluator {
 		case .variable(let name):
 			guard let value = context.variables[name] else { throw EvaluationError.unknownName(name) }
 			return value
+
+		case .total:
+			guard let first = context.block.first else { throw EvaluationError.emptyBlock }
+			var sum = first
+			for value in context.block.dropFirst() {
+				sum = Quantity(sum.amount + value.amount, try unify(sum, value))
+			}
+			return sum
 
 		case .percent(let inner):
 			let value = try plain(evaluate(inner), "A percentage")

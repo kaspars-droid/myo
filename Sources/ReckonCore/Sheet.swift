@@ -1,5 +1,24 @@
 import Foundation
 
+/// Where a name sits in a line, so the editor can colour it.
+public struct NameSpan: Equatable, Sendable {
+	public enum Role: Equatable, Sendable {
+		case defined    // the left of an `=`
+		case used       // read further along
+	}
+
+	/// UTF-16 offsets, which is what a text view measures in.
+	public let range: NSRange
+	public let role: Role
+	public let name: String
+
+	public init(range: NSRange, role: Role, name: String) {
+		self.range = range
+		self.role = role
+		self.name = name
+	}
+}
+
 /// One line of a sheet after evaluation.
 public struct Line: Equatable, Sendable {
 	public enum Kind: Equatable, Sendable {
@@ -23,6 +42,8 @@ public struct Line: Equatable, Sendable {
 	/// Whether this line is one of the amounts, as opposed to a total of them
 	/// or the definition of a name. Only the amounts are added up.
 	public let countsTowardTotal: Bool
+	/// Where the variable names sit in `text`.
+	public let names: [NameSpan]
 
 	public var hasValue: Bool { value != nil }
 }
@@ -98,7 +119,7 @@ public struct Sheet: Sendable {
 		let trimmed = code.trimmingCharacters(in: .whitespaces)
 
 		func record(_ kind: Line.Kind, value: Quantity?, error: String? = nil,
-					countsTowardTotal: Bool = false) -> Line {
+					countsTowardTotal: Bool = false, names: [NameSpan] = []) -> Line {
 			return Line(number: number,
 						text: text,
 						code: code,
@@ -107,10 +128,15 @@ public struct Sheet: Sendable {
 						value: value,
 						formatted: value.map { format($0) },
 						error: error,
-						countsTowardTotal: countsTowardTotal)
+						countsTowardTotal: countsTowardTotal,
+						names: names)
 		}
 
 		if trimmed.isEmpty {
+			// A blank line is where one group of amounts ends and the next
+			// begins. A line that is nothing but a note does not break the
+			// run: a sheet is annotated as it is written.
+			if comment == nil { context.block = [] }
 			return record(comment == nil ? .blank : .comment, value: nil)
 		}
 
@@ -122,9 +148,12 @@ public struct Sheet: Sendable {
 		}
 
 		guard let parsed = Parser.parseLine(tokens: tokens,
-											knownVariables: Set(context.variables.keys)) else {
+											knownVariables: Set(context.variables.keys),
+											blockIsOpen: !context.block.isEmpty) else {
 			return record(.prose, value: nil)
 		}
+
+		let names = Sheet.names(in: code, defined: parsed.name, used: parsed.expr.mentionedNames)
 
 		do {
 			let value = try Evaluator(context: context).evaluate(parsed.expr)
@@ -134,14 +163,25 @@ public struct Sheet: Sendable {
 			// meaningless, which is the whole point of the bar.
 			if let name = parsed.name {
 				context.variables[name] = value
-				return record(.assignment(name), value: value, countsTowardTotal: false)
+				context.block = []      // naming a figure closes the group above
+				return record(.assignment(name), value: value, countsTowardTotal: false,
+							  names: names)
 			}
 
-			return record(.result, value: value, countsTowardTotal: true)
+			// A subtotal must not go into the bar along the bottom as well as
+			// the figures it was made from, and it closes the group it just
+			// added up so the next `total` starts fresh.
+			if parsed.expr.mentionsTotal {
+				context.block = []
+				return record(.result, value: value, countsTowardTotal: false, names: names)
+			}
+
+			context.block.append(value)
+			return record(.result, value: value, countsTowardTotal: true, names: names)
 		} catch let error as EvaluationError {
-			return record(.prose, value: nil, error: error.message)
+			return record(.prose, value: nil, error: error.message, names: names)
 		} catch {
-			return record(.prose, value: nil, error: "\(error)")
+			return record(.prose, value: nil, error: "\(error)", names: names)
 		}
 	}
 
@@ -178,5 +218,109 @@ public struct Sheet: Sendable {
 			return "\(sign)\(symbol)\(digits)"
 		}
 		return "\(sign)\(digits) \(code)"
+	}
+}
+
+// MARK: - Where the names are written
+
+extension Sheet {
+	/// Where every name in a sheet is written, measured against the whole
+	/// text, which is what an editor colours.
+	///
+	/// This runs the sheet a second time rather than reading positions off the
+	/// first, because the editor recolours on the keystroke, before the view
+	/// that evaluated has been handed the new text. A sheet is a screenful of
+	/// arithmetic; running it twice costs nothing and keeps the colour from
+	/// ever lagging a character behind the caret.
+	public func names(in source: String) -> [NameSpan] {
+		var context = Context()
+		var spans: [NameSpan] = []
+		var start = 0
+
+		for (offset, rawLine) in source.components(separatedBy: .newlines).enumerated() {
+			let line = evaluate(rawLine, number: offset + 1, context: &context)
+
+			for span in line.names {
+				spans.append(NameSpan(range: NSRange(location: start + span.range.location,
+													 length: span.range.length),
+									  role: span.role,
+									  name: span.name))
+			}
+
+			start += (rawLine as NSString).length + 1   // past the newline
+		}
+
+		return spans
+	}
+
+	/// Finds the names in one line by looking for them in what was typed.
+	///
+	/// The parser knows which names a line reads but not where they sit, and
+	/// threading a position through every branch of it to find out would cost
+	/// more than it is worth. A name is a run of letters, so looking it up
+	/// again in the line is exact as long as only whole words count — which is
+	/// also what keeps `tame` out of the middle of `tame_kludaina`.
+	static func names(in code: String, defined: String?, used: [String]) -> [NameSpan] {
+		let text = code as NSString
+		var spans: [NameSpan] = []
+
+		if let defined {
+			// The name being defined is the part in front of the `=`.
+			let equals = text.range(of: "=").location
+			let left = NSRange(location: 0, length: equals == NSNotFound ? text.length : equals)
+
+			if let range = occurrences(of: defined, in: text, within: left).first {
+				spans.append(NameSpan(range: range, role: .defined, name: defined))
+			}
+		}
+
+		// Longest first, so `car repair` claims its words before `car` can.
+		for name in Set(used).sorted(by: { $0.count > $1.count }) {
+			for range in occurrences(of: name, in: text,
+									 within: NSRange(location: 0, length: text.length)) {
+				guard !spans.contains(where: { NSIntersectionRange($0.range, range).length > 0 })
+				else { continue }
+				spans.append(NameSpan(range: range, role: .used, name: name))
+			}
+		}
+
+		return spans.sorted { $0.range.location < $1.range.location }
+	}
+
+	private static func occurrences(of name: String, in text: NSString,
+									within bounds: NSRange) -> [NSRange] {
+		guard !name.isEmpty else { return [] }
+
+		var found: [NSRange] = []
+		var start = bounds.location
+		let end = bounds.location + bounds.length
+
+		while start < end {
+			let range = text.range(of: name, options: .literal,
+								   range: NSRange(location: start, length: end - start))
+			guard range.location != NSNotFound else { break }
+
+			if isWholeWord(range, in: text) { found.append(range) }
+			start = range.location + max(range.length, 1)
+		}
+
+		return found
+	}
+
+	/// A match with a letter, digit or underscore against either end is part
+	/// of a longer word, not the name.
+	private static func isWholeWord(_ range: NSRange, in text: NSString) -> Bool {
+		if range.location > 0, isNameCharacter(text.character(at: range.location - 1)) {
+			return false
+		}
+
+		let after = range.location + range.length
+		return after >= text.length || !isNameCharacter(text.character(at: after))
+	}
+
+	private static func isNameCharacter(_ unit: unichar) -> Bool {
+		guard let scalar = Unicode.Scalar(unit) else { return false }
+		let character = Character(scalar)
+		return character.isLetter || character.isNumber || character == "_"
 	}
 }
