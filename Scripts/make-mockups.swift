@@ -16,9 +16,19 @@ import ImageIO
 import Foundation
 import UniformTypeIdentifiers
 
-let arguments = Array(CommandLine.arguments.dropFirst())
+var arguments = Array(CommandLine.arguments.dropFirst())
+
+// A phone's screen corner is a ninth of its width. A tablet's is nowhere near
+// that, and borrowing the phone's radius rounds the corner far enough in to
+// eat the clock and the battery. So the radius is a knob, left where it was.
+var cornerShare: CGFloat = 0.092
+if let flag = arguments.firstIndex(of: "--corner"), flag + 1 < arguments.count {
+	cornerShare = CGFloat(Double(arguments[flag + 1]) ?? 0.092)
+	arguments.removeSubrange(flag...(flag + 1))
+}
+
 guard arguments.count == 2 else {
-	FileHandle.standardError.write(Data("usage: make-mockups.swift <in folder> <out folder>\n".utf8))
+	FileHandle.standardError.write(Data("usage: make-mockups.swift <in folder> <out folder> [--corner <fraction of width>]\n".utf8))
 	exit(2)
 }
 
@@ -70,7 +80,7 @@ func frame(_ shot: CGImage, into url: URL) -> Bool {
 						width: screenWidth, height: screenHeight)
 	let body = screen.insetBy(dx: -bezel, dy: -bezel)
 
-	let screenCorner = screenWidth * 0.092
+	let screenCorner = screenWidth * cornerShare
 	let bodyCorner = screenCorner + bezel
 
 	// A shadow, so the phone sits on the ground rather than in front of it.

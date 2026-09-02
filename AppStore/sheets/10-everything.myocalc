@@ -1,0 +1,30 @@
+# Everything Myo Calc can do
+
+2 + 3 * 4        # times before plus
+(2 + 3) * 4      # brackets first
+7 / 2            # divide, or ÷
+14x100           # x multiplies, so does ×
+2^10             # ^ raises to a power
+
+20% of 300       # a share of a figure
+1200 + 15%       # or added on top
+
+rate = 0.21      # give a figure a name
+1850 * rate      # and use it further down
+
+sqrt(144)        # square root
+pow(2, 8)        # any power
+round(2.6)       # to the nearest whole
+floor(2.6)       # down
+ceil(2.1)        # up
+abs(-30)         # without the sign
+min(9, 4, 7)     # the smallest
+max(9, 4, 7)     # the largest
+log(1000)        # base ten, ln for natural
+
+35eur oil        # a note needs no hash
+45eur filter     # the currency sticks to it
+12.50eur
+total            # the amounts since the blank line
+
+85usd hotel      # each currency totals on its own
