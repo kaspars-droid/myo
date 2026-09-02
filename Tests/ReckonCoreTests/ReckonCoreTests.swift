@@ -1011,6 +1011,57 @@ final class SheetCacheTests: XCTestCase {
 		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
 	}
 
+	/// Listing is separate from fetching so the sheets can be brought down
+	/// several at a time. It answers about sheets, not about everything else
+	/// that shares the folder.
+	func testListingTheSourceFindsSheetsAndNothingElse() throws {
+		try putInSource("volvo.myocalc", "35eur oil")
+		try putInSource("notes.txt", "not a sheet")
+		try putInSource("q1.myocalc", "# Q1")
+
+		let found = try cache.sheets(in: source).map(\.lastPathComponent).sorted()
+
+		XCTAssertEqual(found, ["q1.myocalc", "volvo.myocalc"])
+	}
+
+	/// One sheet at a time is what the phone drives, so it has to be able to
+	/// say whether that sheet was worth copying.
+	func testBringingDownOneSheetReportsWhetherItCopied() throws {
+		try putInSource("volvo.myocalc", "35eur oil")
+		let sheet = source.appendingPathComponent("volvo.myocalc")
+
+		XCTAssertTrue(try cache.bringDown(sheet))
+		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
+
+		// Nothing newer up there: fetching it again is work not worth doing.
+		XCTAssertFalse(try cache.bringDown(sheet))
+	}
+
+	/// A file that reads as empty is more often a placeholder that did not come
+	/// down than a sheet somebody emptied, and only one of those two readings
+	/// can lose work.
+	func testAnEmptyFileDoesNotReplaceASheetWithTextInIt() throws {
+		try putInSource("volvo.myocalc", "35eur oil", ageInSeconds: 60)
+		try cache.refresh(from: source)
+		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
+
+		try putInSource("volvo.myocalc", "")
+		try cache.refresh(from: source)
+
+		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
+	}
+
+	/// A sheet made elsewhere and not yet typed into is empty, and still has to
+	/// arrive: it is the only version there is.
+	func testAnEmptySheetThisPhoneHasNeverSeenStillArrives() throws {
+		try putInSource("fresh.myocalc", "")
+
+		let copied = try cache.refresh(from: source)
+
+		XCTAssertEqual(copied, ["fresh.myocalc"])
+		XCTAssertEqual(cache.read("fresh.myocalc"), "")
+	}
+
 	/// The sheet wanted next is nearly always the one just put down.
 	func testTheLastEditedSheetComesFirst() throws {
 		try putInSource("aaa.myocalc", "oldest", ageInSeconds: 3600)
