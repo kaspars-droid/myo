@@ -61,62 +61,111 @@ public struct SheetCache: Sendable {
 	public func refresh(from source: URL) throws -> [String] {
 		try makeFolder()
 
-		let contents = try manager.contentsOfDirectory(
-			at: source, includingPropertiesForKeys: [.contentModificationDateKey],
-			options: [.skipsHiddenFiles])
-
-		var copied: [String] = []
-
-		for original in contents where original.pathExtension.lowercased() == Self.fileExtension {
-			let name = original.lastPathComponent
-			let local = url(for: name)
-
-			if manager.fileExists(atPath: local.path), !isNewer(original, than: local) {
-				continue
-			}
-
-			// A sheet in a cloud folder may be a placeholder that has never been
-			// downloaded. Reading one gives nothing, and a sheet with no text
-			// has no first line to be named after — which is how a folder full
-			// of named sheets ends up listed as "Untitled".
-			Self.materialise(original)
-
-			guard let data = try? Data(contentsOf: original), !data.isEmpty else { continue }
-			try data.write(to: local, options: .atomic)
-
-			// The copy carries the original's date rather than today's, so
-			// "has it changed since we fetched it" stays answerable even when
-			// a cloud folder hands back files with dates set on another
-			// machine, or a clock that disagrees with this one.
-			if let stamped = try? original.resourceValues(forKeys: [.contentModificationDateKey])
-				.contentModificationDate {
-				try? manager.setAttributes([.modificationDate: stamped], ofItemAtPath: local.path)
-			}
-
-			copied.append(name)
-		}
-
-		return copied
+		return try sheets(in: source).filter { try bringDown($0) }
+			.map(\.lastPathComponent)
 	}
 
-	/// Asks for a placeholder to be fetched, and waits briefly for it.
+	/// The sheets the source folder holds, in the order it listed them.
 	///
-	/// Briefly, because this runs while someone is waiting to see their sheets:
-	/// a slow file is better missing from this pass than holding up the rest.
-	private static func materialise(_ url: URL) {
-		let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-			.ubiquitousItemDownloadingStatus
-		guard status != nil, status != .current else { return }
-
-		try? FileManager.default.startDownloadingUbiquitousItem(at: url)
-
-		let deadline = Date().addingTimeInterval(3)
-		while Date() < deadline {
-			let now = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-				.ubiquitousItemDownloadingStatus
-			if now == .current { return }
-			Thread.sleep(forTimeInterval: 0.1)
+	/// Asked for separately from fetching them because the two take wildly
+	/// different amounts of time: a folder answers about itself quickly, and
+	/// then each sheet in it may be a download. Knowing the names first is
+	/// what lets the sheets be fetched several at a time, and shown as they
+	/// land rather than all at the end.
+	public func sheets(in source: URL) throws -> [URL] {
+		try listing(of: source).filter {
+			$0.pathExtension.lowercased() == Self.fileExtension
 		}
+	}
+
+	/// Copies one sheet in, if the source has a newer version than this phone.
+	/// Returns whether it copied anything.
+	@discardableResult
+	public func bringDown(_ original: URL) throws -> Bool {
+		let local = url(for: original.lastPathComponent)
+
+		if manager.fileExists(atPath: local.path), !isNewer(original, than: local) {
+			return false
+		}
+
+		guard let data = Self.fetch(original) else { return false }
+
+		// Nothing is worth replacing a sheet that has text in it. A file
+		// that reads as empty is usually a placeholder that did not come
+		// down rather than a sheet someone emptied, and the two are not
+		// worth telling apart when one of the answers loses work. A sheet
+		// this phone has never seen is a different case: empty is all
+		// there is to fetch, and a new sheet should still appear.
+		if data.isEmpty, manager.fileExists(atPath: local.path) { return false }
+
+		try data.write(to: local, options: .atomic)
+
+		// The copy carries the original's date rather than today's, so
+		// "has it changed since we fetched it" stays answerable even when
+		// a cloud folder hands back files with dates set on another
+		// machine, or a clock that disagrees with this one.
+		if let stamped = try? original.resourceValues(forKeys: [.contentModificationDateKey])
+			.contentModificationDate {
+			try? manager.setAttributes([.modificationDate: stamped], ofItemAtPath: local.path)
+		}
+
+		return true
+	}
+
+	/// What the source folder holds, asked for in a way a cloud folder answers
+	/// truthfully.
+	///
+	/// A folder belonging to a file provider — iCloud Drive, Google Drive,
+	/// Dropbox — is a local shadow of something else, and listing it plainly
+	/// reports the shadow: a sheet added on another device may not be in it
+	/// yet. A coordinated read is the ask that makes the provider go and look
+	/// first, so a sheet written elsewhere a moment ago is in the answer.
+	private func listing(of source: URL) throws -> [URL] {
+		var found: [URL]?
+		var failure: NSError?
+
+		NSFileCoordinator().coordinate(readingItemAt: source, options: [], error: &failure) { url in
+			found = try? manager.contentsOfDirectory(
+				at: url, includingPropertiesForKeys: [.contentModificationDateKey],
+				options: [.skipsHiddenFiles])
+		}
+
+		// Coordination can be refused — most often by the provider being busy
+		// with the same folder — and a stale listing beats no listing at all.
+		if let found { return found }
+		return try manager.contentsOfDirectory(
+			at: source, includingPropertiesForKeys: [.contentModificationDateKey],
+			options: [.skipsHiddenFiles])
+	}
+
+	/// Reads a sheet out of the source folder, fetching it first if it is only
+	/// a placeholder there.
+	///
+	/// The old version of this asked iCloud whether the file needed
+	/// downloading, and gave up when the answer was nothing at all. Only
+	/// iCloud answers that question: every other provider returns nil, which
+	/// was read as "already here" — so a Google Drive or Dropbox sheet was
+	/// never fetched, read as no bytes, and quietly skipped.
+	///
+	/// A coordinated read is the ask that every provider understands. It
+	/// blocks until the file is really there, so this must not run on the
+	/// thread drawing the screen.
+	private static func fetch(_ url: URL) -> Data? {
+		// iCloud still wants telling separately, and starting the download
+		// before coordinating means the wait below is usually already over.
+		if let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+			.ubiquitousItemDownloadingStatus, status != .current {
+			try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+		}
+
+		var data: Data?
+		var failure: NSError?
+
+		NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &failure) { url in
+			data = try? Data(contentsOf: url)
+		}
+
+		return failure == nil ? data : nil
 	}
 
 	private func isNewer(_ one: URL, than other: URL) -> Bool {
