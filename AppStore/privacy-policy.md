@@ -1,6 +1,6 @@
 # Privacy Policy — Myo Calc
 
-Last updated: 19 August 2026. Applies to Myo Calc 1.2 for iOS, iPadOS and
+Last updated: 2 September 2026. Applies to Myo Calc 1.3 for iOS, iPadOS and
 macOS, published by Kaspars Cirsis.
 
 ## The short version
