@@ -7,10 +7,15 @@ Package.resolved
 # output rather than source.
 Myo Calc.app/
 Myo Calc.zip
+Myo Calc.pkg
 DerivedData/
 
 # The iOS archive and the IPA the release script exports.
 build/
+
+# The Mac App Store profile appstore-mac.sh embeds. It belongs to the Apple
+# account and expires, so each machine downloads its own.
+*.provisionprofile
 
 # Xcode
 *.xcuserstate
