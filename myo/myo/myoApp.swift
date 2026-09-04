@@ -54,47 +54,59 @@ struct MyoApp: App {
 	private var toolbar: some ToolbarContent {
 		// Toolbar items sit on a shared capsule of glass by default, which
 		// round two plain icons reads as a button they are not.
-		ToolbarItem(placement: .topBarTrailing) {
-			Button { store.newSheet() } label: { Image(systemName: "plus") }
-				.accessibilityLabel("New sheet")
+		//
+		// That capsule is iOS 26's. Before it there is nothing behind the icons
+		// to hide, so the plain item is already what asking for it would give —
+		// which is the whole of what this app needed iOS 26 for.
+		if #available(iOS 26.0, *) {
+			ToolbarItem(placement: .topBarTrailing) { newSheetButton }
+				.sharedBackgroundVisibility(.hidden)
+			ToolbarItem(placement: .topBarTrailing) { sheetMenu }
+				.sharedBackgroundVisibility(.hidden)
+		} else {
+			ToolbarItem(placement: .topBarTrailing) { newSheetButton }
+			ToolbarItem(placement: .topBarTrailing) { sheetMenu }
 		}
-		.sharedBackgroundVisibility(.hidden)
+	}
 
-		ToolbarItem(placement: .topBarTrailing) {
-			Menu {
-				if store.isFetching, store.sheets.isEmpty {
-					Text("Fetching sheets…")
-				} else if store.sheets.isEmpty {
-					Text(store.folder == nil ? "No folder chosen yet" : "No sheets in this folder")
-				} else {
-					ForEach(store.sheets, id: \.self) { name in
-						Button {
-							store.load(name)
-						} label: {
-							if name == store.current {
-								Label(store.displayName(of: name), systemImage: "checkmark")
-							} else {
-								Text(store.displayName(of: name))
-							}
+	private var newSheetButton: some View {
+		Button { store.newSheet() } label: { Image(systemName: "plus") }
+			.accessibilityLabel("New sheet")
+	}
+
+	private var sheetMenu: some View {
+		Menu {
+			if store.isFetching, store.sheets.isEmpty {
+				Text("Fetching sheets…")
+			} else if store.sheets.isEmpty {
+				Text(store.folder == nil ? "No folder chosen yet" : "No sheets in this folder")
+			} else {
+				ForEach(store.sheets, id: \.self) { name in
+					Button {
+						store.load(name)
+					} label: {
+						if name == store.current {
+							Label(store.displayName(of: name), systemImage: "checkmark")
+						} else {
+							Text(store.displayName(of: name))
 						}
 					}
 				}
-
-				Divider()
-				Button("Choose Folder…") { store.isChoosingFolder = true }
-				if store.folder != nil {
-					if store.isFetching {
-						Text("Fetching sheets…")
-					} else {
-						Button("Refresh from Cloud") { store.refresh() }
-					}
-				}
-			} label: {
-				Image(systemName: "line.3.horizontal")
 			}
-			.accessibilityLabel("Switch sheet")
+
+			Divider()
+			Button("Choose Folder…") { store.isChoosingFolder = true }
+			if store.folder != nil {
+				if store.isFetching {
+					Text("Fetching sheets…")
+				} else {
+					Button("Refresh from Cloud") { store.refresh() }
+				}
+			}
+		} label: {
+			Image(systemName: "line.3.horizontal")
 		}
-		.sharedBackgroundVisibility(.hidden)
+		.accessibilityLabel("Switch sheet")
 	}
 }
 
