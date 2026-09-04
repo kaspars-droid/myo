@@ -7,6 +7,12 @@
 	     be able to do. -->
 	<key>com.apple.security.app-sandbox</key><true/>
 
+	<!-- TestFlight matches the signature against the provisioning profile;
+	     without these the signature carries no identifier and the build is
+	     refused. -->
+	<key>com.apple.application-identifier</key><string>BFE454ZWZZ.lv.cirsis.myo</string>
+	<key>com.apple.developer.team-identifier</key><string>BFE454ZWZZ</string>
+
 	<!-- The sheet folder is chosen by hand through an NSOpenPanel, and the
 	     panel is what grants access to it. -->
 	<key>com.apple.security.files.user-selected.read-write</key><true/>
