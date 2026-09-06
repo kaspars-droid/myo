@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Everything else in this app's Info.plist is generated from build
+	     settings, and this key has no build setting to generate it from. It is
+	     here on its own rather than the whole file being written by hand.
+
+	     What it does: puts the app's own Documents folder in the Files app,
+	     under On My iPhone. Sheets written before a folder has been chosen live
+	     in there, and without this they are somewhere nobody but the app can
+	     reach — which is a strange thing for an app whose whole point is that a
+	     sheet is a plain file you own. -->
+	<key>UIFileSharingEnabled</key><true/>
+</dict>
+</plist>
