@@ -1011,6 +1011,19 @@ final class SheetCacheTests: XCTestCase {
 		XCTAssertEqual(cache.read("volvo.myocalc"), "35eur oil")
 	}
 
+	/// A sheet moving into a folder it did not come from must not land on top
+	/// of one already called that. Two sheets named alike is a nuisance; one
+	/// quietly replacing the other is a loss.
+	func testASheetMovingIntoAFolderKeepsClearOfWhatIsThere() throws {
+		XCTAssertEqual(SheetCache.unusedName(like: "volvo.myocalc", in: source), "volvo.myocalc")
+
+		try putInSource("volvo.myocalc", "someone else's")
+		XCTAssertEqual(SheetCache.unusedName(like: "volvo.myocalc", in: source), "volvo 2.myocalc")
+
+		try putInSource("volvo 2.myocalc", "and another")
+		XCTAssertEqual(SheetCache.unusedName(like: "volvo.myocalc", in: source), "volvo 3.myocalc")
+	}
+
 	/// Listing is separate from fetching so the sheets can be brought down
 	/// several at a time. It answers about sheets, not about everything else
 	/// that shares the folder.
