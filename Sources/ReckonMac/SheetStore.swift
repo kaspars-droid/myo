@@ -152,6 +152,31 @@ final class SheetStore: ObservableObject {
 		UserDefaults.standard.removeObject(forKey: Self.lastSheetKey)
 	}
 
+	/// Deletes a sheet, by putting it in the trash.
+	///
+	/// The same reasoning as `discardIfEmpty`, and with more force: that one is
+	/// a guess about a file nobody said to delete, this one is a document
+	/// someone picked out of a list and may have picked by mistake. The Finder
+	/// has a place for exactly this, and it is one keystroke to undo.
+	func remove(_ target: URL) {
+		var trashed: NSURL?
+		guard (try? FileManager.default.trashItem(at: target, resultingItemURL: &trashed)) != nil
+		else { return }
+
+		refreshEntries()
+		guard url == target else { return }
+
+		// The sheet on screen has just gone. Cleared before anything else, so
+		// the save that follows has no file left to write it back to.
+		url = nil
+		contentsOnDisk = ""
+		titleOnDisk = ""
+		document = SheetDocument(text: "")
+		UserDefaults.standard.removeObject(forKey: Self.lastSheetKey)
+
+		if let first = entries.first { load(first.url) } else { newSheet() }
+	}
+
 	func load(_ target: URL) {
 		leaveCurrentSheet(goingTo: target)
 
