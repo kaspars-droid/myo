@@ -75,9 +75,52 @@ final class SheetStore: ObservableObject {
 			load(URL(fileURLWithPath: remembered))
 		} else if let first = entries.first {
 			load(first.url)
+		} else if folder == nil, let held = heldText() {
+			// Typed before a folder was chosen, and still homeless. It stays a
+			// sheet with no file behind it, so choosing a folder still moves it
+			// into that folder rather than leaving a copy in here.
+			document = SheetDocument(text: held)
 		} else {
 			document = SheetDocument(text: SheetStore.welcome)
 		}
+	}
+
+	// MARK: - The sheet with nowhere to go yet
+
+	/// Where a sheet lives while there is no folder to put it in.
+	///
+	/// The app otherwise never writes a sheet anywhere you did not pick, and
+	/// that is worth keeping true — so this holds one sheet, only until a
+	/// folder is chosen, and gives it up the moment there is one. Without it,
+	/// typing on the welcome screen and quitting loses the lot, because before
+	/// a folder there is nowhere for `saveNow` to write.
+	private var holding: URL {
+		URL.documentsDirectory.appendingPathComponent("Unsaved.\(Self.fileExtension)")
+	}
+
+	private func heldText() -> String? {
+		guard let text = try? String(contentsOf: holding, encoding: .utf8),
+			  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+		else { return nil }
+
+		return text
+	}
+
+	/// Keeps what has been typed while there is still nowhere to put it.
+	private func saveHolding() {
+		let contents = document.fileContents
+
+		guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+			  contents != SheetStore.welcome
+		else { return dropHolding() }
+
+		try? FileManager.default.createDirectory(
+			at: holding.deletingLastPathComponent(), withIntermediateDirectories: true)
+		try? contents.write(to: holding, atomically: true, encoding: .utf8)
+	}
+
+	private func dropHolding() {
+		try? FileManager.default.removeItem(at: holding)
 	}
 
 	/// Leaving the sheet you are on: save what is worth saving, throw away
@@ -172,6 +215,8 @@ final class SheetStore: ObservableObject {
 		access.adopt(chosen)
 
 		let rehomed = rehome(into: chosen)
+		// Whatever was being held has a folder now, or was never worth holding.
+		dropHolding()
 		refreshEntries()
 		watcher.watch(folder: folder, file: url)
 
@@ -263,7 +308,7 @@ final class SheetStore: ObservableObject {
 	}
 
 	func saveNow() {
-		guard let url else { return }
+		guard let url else { return saveHolding() }
 
 		let contents = document.fileContents
 		guard contents != contentsOnDisk else { return }
