@@ -27,26 +27,38 @@ public struct SheetView: View {
 			for: results.map(\.formatted) + totals.map { sheet.format($0) })
 
 		VStack(spacing: 0) {
-			ScrollView {
-				// The sheet and its results are one view: they share a layout,
-				// which is the only way a result stays level with its line.
-				SheetTextView(text: textBinding,
-							  results: results.map(\.formatted),
-							  columnWidth: resultColumn,
-							  sheet: sheet)
-					.frame(maxWidth: .infinity, alignment: .topLeading)
-					.padding(20)
+			// The reader is here to tell the sheet how much room it has, so it
+			// can fill it. A sheet only as tall as its text leaves everything
+			// below it belonging to the scroll view, where a tap does nothing
+			// at all.
+			GeometryReader { proxy in
+				ScrollView {
+					// The sheet and its results are one view: they share a
+					// layout, which is the only way a result stays level with
+					// its line.
+					SheetTextView(text: textBinding,
+								  results: results.map(\.formatted),
+								  columnWidth: resultColumn,
+								  sheet: sheet,
+								  minHeight: proxy.size.height - Self.margin * 2)
+						.frame(maxWidth: .infinity, alignment: .topLeading)
+						.padding(Self.margin)
+				}
+				// The sheet measures itself once it is laid out, and a scroll
+				// view flashes its bars whenever the content size changes. On a
+				// sheet that fits, that reads as a glitch on opening.
+				.scrollIndicators(.never)
+				.scrollBounceBehavior(.basedOnSize)
 			}
-			// The sheet measures itself once it is laid out, and a scroll view
-			// flashes its bars whenever the content size changes. On a sheet
-			// that fits, that reads as a glitch on opening.
-			.scrollIndicators(.never)
-			.scrollBounceBehavior(.basedOnSize)
 
 			Divider()
 			totalBar(for: totals, width: resultColumn)
 		}
 	}
+
+	/// The space around the sheet, taken off the room it is given so that a
+	/// full-height sheet is still inset from the edges.
+	private static let margin: CGFloat = 20
 
 	// MARK: - The bar along the bottom
 

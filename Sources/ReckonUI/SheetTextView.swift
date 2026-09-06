@@ -205,6 +205,16 @@ struct SheetTextView: NSViewRepresentable {
 	/// them about which words are names.
 	var sheet: Sheet
 
+	/// How tall to be even when the text does not need it.
+	///
+	/// A sheet is as tall as what is written in it, which on an empty one is a
+	/// single line — and a tap anywhere below that line lands on the scroll
+	/// view rather than the text, so nothing takes the caret and no keyboard
+	/// comes up. Filling the space instead makes the whole sheet the sheet:
+	/// tap low and the caret goes where a caret goes, at the end of what is
+	/// written.
+	var minHeight: CGFloat = 0
+
 	func makeCoordinator() -> Coordinator { Coordinator(self) }
 
 	func makeNSView(context: Context) -> SheetEditorView {
@@ -219,7 +229,7 @@ struct SheetTextView: NSViewRepresentable {
 	func sizeThatFits(_ proposal: ProposedViewSize, nsView view: SheetEditorView,
 					  context: Context) -> CGSize? {
 		guard let width = proposal.width, width > 0, width < .infinity else { return nil }
-		return CGSize(width: width, height: view.height(forWidth: width))
+		return CGSize(width: width, height: max(view.height(forWidth: width), minHeight))
 	}
 
 	func updateNSView(_ view: SheetEditorView, context: Context) {
@@ -437,6 +447,16 @@ struct SheetTextView: UIViewRepresentable {
 	/// them about which words are names.
 	var sheet: Sheet
 
+	/// How tall to be even when the text does not need it.
+	///
+	/// A sheet is as tall as what is written in it, which on an empty one is a
+	/// single line — and a tap anywhere below that line lands on the scroll
+	/// view rather than the text, so nothing takes the caret and no keyboard
+	/// comes up. Filling the space instead makes the whole sheet the sheet:
+	/// tap low and the caret goes where a caret goes, at the end of what is
+	/// written.
+	var minHeight: CGFloat = 0
+
 	func makeCoordinator() -> Coordinator { Coordinator(self) }
 
 	func makeUIView(context: Context) -> SheetEditorView {
@@ -451,7 +471,7 @@ struct SheetTextView: UIViewRepresentable {
 	func sizeThatFits(_ proposal: ProposedViewSize, uiView view: SheetEditorView,
 					  context: Context) -> CGSize? {
 		guard let width = proposal.width, width > 0, width < .infinity else { return nil }
-		return CGSize(width: width, height: view.height(forWidth: width))
+		return CGSize(width: width, height: max(view.height(forWidth: width), minHeight))
 	}
 
 	func updateUIView(_ view: SheetEditorView, context: Context) {
