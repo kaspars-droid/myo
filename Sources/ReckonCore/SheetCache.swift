@@ -82,7 +82,20 @@ public struct SheetCache: Sendable {
 	/// Returns whether it copied anything.
 	@discardableResult
 	public func bringDown(_ original: URL) throws -> Bool {
-		let local = url(for: original.lastPathComponent)
+		try bringDown(original, as: original.lastPathComponent)
+	}
+
+	/// The same, for a sheet that cannot be called here what it is called
+	/// there.
+	///
+	/// Two reasons it might not be. A sheet picked on its own out of a cloud
+	/// folder can share a name with one already here, and one quietly
+	/// replacing the other is a loss. And a sheet kept as plain `.txt` — which
+	/// the engine reads just as happily — has to end in `.myocalc` to be
+	/// listed at all.
+	@discardableResult
+	public func bringDown(_ original: URL, as name: String) throws -> Bool {
+		let local = url(for: name)
 
 		if manager.fileExists(atPath: local.path), !isNewer(original, than: local) {
 			return false
@@ -324,7 +337,18 @@ public struct SheetCache: Sendable {
 	}
 
 	/// Throws away everything, for when a different folder is chosen.
-	public func empty() {
-		try? manager.removeItem(at: folder)
+	///
+	/// Except the sheets named, which are kept. A sheet linked to a file of
+	/// its own is not this folder's copy of anything, so changing folders is
+	/// not a reason to lose it.
+	public func empty(keeping kept: Set<String> = []) {
+		guard !kept.isEmpty else {
+			try? manager.removeItem(at: folder)
+			return
+		}
+
+		for name in names() where !kept.contains(name) {
+			try? manager.removeItem(at: url(for: name))
+		}
 	}
 }

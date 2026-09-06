@@ -1280,6 +1280,40 @@ final class SheetCacheTests: XCTestCase {
 		cache.empty()
 		XCTAssertEqual(cache.names(), [])
 	}
+
+	func testEmptyingKeepsTheSheetsItIsToldToKeep() throws {
+		try putInSource("a.myocalc", "x")
+		try putInSource("b.myocalc", "y")
+		try cache.refresh(from: source)
+
+		cache.empty(keeping: ["b.myocalc"])
+
+		XCTAssertEqual(cache.names(), ["b.myocalc"])
+		XCTAssertEqual(cache.read("b.myocalc"), "y")
+	}
+
+	func testASheetCanComeDownUnderAnotherName() throws {
+		try putInSource("notes.txt", "1 + 1")
+
+		let copied = try cache.bringDown(source.appendingPathComponent("notes.txt"),
+										 as: "notes.myocalc")
+
+		XCTAssertTrue(copied)
+		XCTAssertEqual(cache.names(), ["notes.myocalc"])
+		XCTAssertEqual(cache.read("notes.myocalc"), "1 + 1")
+	}
+
+	func testTwoSheetsOfTheSameNameCanBothBeKept() throws {
+		try putInSource("Untitled.myocalc", "theirs")
+		try cache.write("mine", to: "Untitled.myocalc", source: nil)
+
+		let name = SheetCache.unusedName(like: "Untitled.myocalc", in: cache.folder)
+		try cache.bringDown(source.appendingPathComponent("Untitled.myocalc"), as: name)
+
+		XCTAssertEqual(name, "Untitled 2.myocalc")
+		XCTAssertEqual(cache.read("Untitled.myocalc"), "mine")
+		XCTAssertEqual(cache.read("Untitled 2.myocalc"), "theirs")
+	}
 }
 
 @MainActor
