@@ -1,6 +1,6 @@
 # Privacy Policy — Myo Calc
 
-Last updated: 2 September 2026. Applies to Myo Calc 1.3 for iOS, iPadOS and
+Last updated: 6 September 2026. Applies to Myo Calc 1.4 for iOS, iPadOS and
 macOS, published by Kaspars Cirsis.
 
 ## The short version
@@ -16,15 +16,25 @@ folder you choose the first time you use the app. Nothing about that file is
 hidden from you: it opens in any text editor, and you can move, copy or delete
 it without the app.
 
+Some services will not let an app be pointed at a folder at all. Sheets can be
+added one at a time instead, from the same file picker. Those stay exactly
+where they are: the app reads and writes that one file and nothing else around
+it, and removing it from the list leaves it where you put it.
+
+Before you have chosen anywhere, sheets are kept in the app's own Documents
+folder, which the Files app shows under On My iPhone. They are ordinary files
+there too, and choosing a folder later moves them into it.
+
 **A local copy of that folder.** Sheets often live in a cloud folder, which on
 a phone is fetched on demand and may not arrive at all when offline. So the app
 keeps its own copy inside its private storage on the device. That copy holds
 the same sheets and nothing more. Deleting the app deletes it.
 
-**Which folder you picked.** The app remembers your choice so it does not have
-to ask again. On macOS this is stored as a security-scoped bookmark, which is
-Apple's mechanism for a sandboxed app to reopen a folder you granted it. It
-records a location on your own disk, not the contents of anything.
+**Which folder you picked, and which sheets you added.** The app remembers so
+it does not have to ask again. Both are kept as security-scoped bookmarks,
+which is Apple's mechanism for a sandboxed app to reopen something you granted
+it — one for the folder, and one for each sheet added on its own. A bookmark
+records a location you chose, not the contents of anything.
 
 That is the complete list. There is no other file, database or setting in which
 the app keeps anything about you.
@@ -54,6 +64,10 @@ service copies those files off the device according to your arrangement with
 it, under its own privacy policy, not this one. The app simply reads and writes
 files where you told it to; it has no connection to any such service, and no
 way to send your sheets anywhere on its own.
+
+The same is true of a sheet added on its own out of one of those services. The
+app was granted that one file and can reach nothing else in the account it
+came from.
 
 ## What Apple sees
 
