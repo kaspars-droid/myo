@@ -101,48 +101,13 @@ private struct SheetControls: View {
 		.help("New sheet")
 
 		// A menu rather than a popover: it is what the system uses for a list
-		// hanging off a button, and it places itself.
-		Menu {
-			if store.entries.isEmpty {
-				Text(store.folder == nil ? "No folder chosen yet" : "No sheets in this folder")
-			} else {
-				ForEach(store.entries) { entry in
-					Button {
-						if entry.url != store.url { store.load(entry.url) }
-					} label: {
-						if entry.url == store.url {
-							Label(entry.name, systemImage: "checkmark")
-						} else {
-							Text(entry.name)
-						}
-					}
-				}
-			}
-
-			Divider()
-			Button("Select Folder…") { store.chooseFolder() }
-
-			// Without a Dock icon or an application menu, these are the only
-			// ways left to reach the window or to quit.
-			Button("Open in a Window") {
-				openWindow(id: MyoApp.windowID)
-				NSApp.activate(ignoringOtherApps: true)
-			}
-
-			Divider()
-			Toggle("Start at Login", isOn: Binding(
-				get: { LoginItem.isEnabled },
-				set: { LoginItem.setEnabled($0) }))
-
-			Divider()
-			Button("Quit Myo Calc") { NSApplication.shared.terminate(nil) }
-				.keyboardShortcut("q")
-		} label: {
-			Image(systemName: "line.3.horizontal").font(Palette.controlFont)
+		// hanging off a button, and it places itself. Built in AppKit rather
+		// than SwiftUI because a SwiftUI menu row is one button with one
+		// action, and these rows have two things in them.
+		SheetMenu(store: store) {
+			openWindow(id: MyoApp.windowID)
+			NSApp.activate(ignoringOtherApps: true)
 		}
-		.buttonStyle(.plain)
-		.foregroundStyle(Palette.label)
-		.help("Switch sheet")
 	}
 }
 
