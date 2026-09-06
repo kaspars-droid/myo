@@ -3,14 +3,66 @@
 <plist version="1.0">
 <dict>
 	<!-- Everything else in this app's Info.plist is generated from build
-	     settings, and this key has no build setting to generate it from. It is
-	     here on its own rather than the whole file being written by hand.
+	     settings; what is here has no build setting to generate it from. -->
 
-	     What it does: puts the app's own Documents folder in the Files app,
-	     under On My iPhone. Sheets written before a folder has been chosen live
-	     in there, and without this they are somewhere nobody but the app can
-	     reach — which is a strange thing for an app whose whole point is that a
-	     sheet is a plain file you own. -->
+	<!-- Puts the app's own Documents folder in the Files app, under On My
+	     iPhone. Sheets written before a folder has been chosen live in there,
+	     and without this they are somewhere nobody but the app can reach —
+	     which is a strange thing for an app whose whole point is that a sheet
+	     is a plain file you own. -->
 	<key>UIFileSharingEnabled</key><true/>
+
+	<!-- What a .myocalc file is. The Mac app has said so since it shipped;
+	     this is the phone saying the same thing, which is what makes the type
+	     mean anything here.
+
+	     Two things follow from it. The picker knows which files to offer when
+	     sheets are added one at a time, instead of greying out the very files
+	     it was opened to find. And Myo appears in Open In, so a sheet tapped
+	     in the Files app — or in Google Drive's or Dropbox's own app, neither
+	     of which will hand over a folder — opens here, in place, rather than
+	     as a copy going nowhere.
+
+	     A sheet is still plain UTF-8 text, which is what it conforms to, so
+	     anything that opens text can open one. -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key><string>lv.cirsis.myo.sheet</string>
+			<key>UTTypeDescription</key><string>Myo Calc Sheet</string>
+			<key>UTTypeConformsTo</key>
+			<array><string>public.utf8-plain-text</string></array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array><string>myocalc</string></array>
+			</dict>
+		</dict>
+	</array>
+
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key><string>Myo Calc Sheet</string>
+			<key>CFBundleTypeRole</key><string>Editor</string>
+			<!-- Owner, because these are Myo's files and no one else's. -->
+			<key>LSHandlerRank</key><string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array><string>lv.cirsis.myo.sheet</string></array>
+		</dict>
+		<dict>
+			<!-- Plain text as well, and not out of ambition: a provider that
+			     has never heard of .myocalc reports one as text, or as
+			     something even vaguer, and Open In goes by what it says. Myo
+			     reads any text file anyway — the engine has never cared what a
+			     sheet is called. Alternate, so the app that owns .txt keeps
+			     it. -->
+			<key>CFBundleTypeName</key><string>Text</string>
+			<key>CFBundleTypeRole</key><string>Editor</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array><string>public.plain-text</string></array>
+		</dict>
+	</array>
 </dict>
 </plist>
