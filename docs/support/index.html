@@ -130,10 +130,16 @@ comma for decimals, then you can type <code>12,50</code> as well as
 <p>A sheet is a plain text file ending in <code>.myocalc</code>. It opens in any
 text editor and stays readable without this app, which is the point of it.</p>
 
-<p>The app keeps its sheets in a folder you choose. Until you choose one, it keeps
-them privately inside the app on the device. On iPhone and iPad the app also
-holds its own copy of that folder so sheets open instantly and still work with
-no signal.</p>
+<p>The app keeps its sheets in a folder you choose. Until you choose one they go
+in the app's own Documents folder, which on iPhone and iPad the Files app shows
+under <strong>On My iPhone &rarr; Myo Calc</strong>. They are ordinary files
+there too, and choosing a folder later moves them into it rather than leaving
+them behind.</p>
+
+<p>On iPhone and iPad the app also holds its own copy of whatever folder you
+chose, so sheets open instantly and still work with no signal. That copy is kept
+where the Files app does not show it, so a sheet appears once — where it lives,
+not twice.</p>
 
 <h2>The same sheets on more than one device</h2>
 
@@ -145,6 +151,49 @@ writes ordinary files, so the sync is the service's job rather than the app's.</
 sheet is edited on two devices at once, the last write wins and the other
 version is gone. Editing one sheet in one place at a time is safe; editing it in
 two places at once is not.</p>
+
+<h2>Google Drive, Dropbox, and folders that cannot be chosen</h2>
+
+<p>On iPhone and iPad, Google Drive, Dropbox and Box appear greyed out in the
+folder picker and cannot be selected. That is their decision rather than this
+app's: a service has to declare that its folders may be picked, and those do
+not. iCloud Drive, On My iPhone, network shares and USB drives all can be. On a
+Mac the picker can choose them, because macOS presents them as ordinary folders
+on disk.</p>
+
+<p>Sheets from those services can be added one at a time instead. In the menu,
+choose <strong>Add Sheets&hellip;</strong> and pick the ones you want. Each stays
+where it is: the app reads it, writes your edits back to it, and keeps it in the
+list from then on, marked with a small cloud.</p>
+
+<p>What you do not get is discovery. The app was granted that one file and
+nothing around it, so a sheet added to that folder from another device will not
+turn up on its own — add it the same way when you want it.</p>
+
+<p>The picker offers every file, not only sheets, because those services do not
+always say what a <code>.myocalc</code> file is; asked only for sheets, it would
+grey out the very files you were looking for. If you pick something that is not
+text, the app says <strong>Not a sheet</strong> and adds nothing.</p>
+
+<h2>Deleting a sheet</h2>
+
+<p>On a Mac, every sheet in the list has an X on the right. Press it once and it
+becomes a red trash can; press that and the sheet is deleted. It goes to the
+Trash, so a delete you did not mean is one keystroke to undo in the Finder.</p>
+
+<p>On iPhone and iPad, open the menu, choose <strong>Delete Sheet</strong> and
+pick a sheet. The menu then asks <strong>Delete <em>name</em>?</strong> in red,
+and tapping that carries it out. Two presses on both platforms, on purpose, and
+both forget again after a few seconds if you go no further.</p>
+
+<p>A sheet added one at a time from Google Drive or Dropbox is only removed from
+the list. The file stays in the service you put it in: the app was never granted
+permission to delete anything there, and does not.</p>
+
+<p>Emptying a sheet and moving to another one deletes it as well — a sheet with
+nothing left in it has been finished with, and without this a folder fills up
+with blank ones. A cloud sheet is the exception, because emptying it is an edit
+like any other and is written back as one.</p>
 
 <h2>If something looks wrong</h2>
 
@@ -160,12 +209,18 @@ two places at once is not.</p>
       not lost, whatever the app is showing.</li>
   <li><strong>A cloud sheet did not arrive.</strong> Open the folder in the
       service's own app first and let it download, then reopen Myo Calc.</li>
+  <li><strong>The folder you want is greyed out.</strong> Some services do not
+      allow their folders to be picked at all. Add those sheets one at a time
+      instead — see above.</li>
+  <li><strong>A sheet added one at a time is out of date.</strong> Only that one
+      file was shared with the app, so it follows that file and nothing else. If
+      the sheet was replaced rather than edited over there, add it again.</li>
 </ul>
 
 <h2>What you need to run it</h2>
 
 <ul>
-  <li>iPhone and iPad: iOS or iPadOS 26.5 or later.</li>
+  <li>iPhone and iPad: iOS or iPadOS 17 or later.</li>
   <li>Mac: macOS 15 or later.</li>
 </ul>
 
