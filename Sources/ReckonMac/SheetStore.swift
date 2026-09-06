@@ -167,13 +167,42 @@ final class SheetStore: ObservableObject {
 		leaveCurrentSheet()
 
 		folder = chosen
+		// Before anything is written into the folder: sandboxed, adopting it is
+		// what makes it writable at all.
 		access.adopt(chosen)
+
+		let rehomed = rehome(into: chosen)
 		refreshEntries()
 		watcher.watch(folder: folder, file: url)
 
-		if openFirst, let first = entries.first, first.url != url {
+		if let rehomed {
+			load(rehomed)
+		} else if openFirst, let first = entries.first, first.url != url {
 			load(first.url)
 		}
+	}
+
+	/// Writes the sheet that has no file behind it into the folder just chosen,
+	/// and answers with where it went.
+	///
+	/// Until a folder is chosen there is nowhere to save, so a sheet typed
+	/// before then exists only on screen. It used to be dropped the moment a
+	/// folder arrived, when the folder's own first sheet opened over the top of
+	/// it. Whatever was typed goes into the folder instead.
+	private func rehome(into chosen: URL) -> URL? {
+		guard url == nil else { return nil }
+
+		let text = document.fileContents
+		guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+			  text != SheetStore.welcome
+		else { return nil }
+
+		let stem = SheetCache.fileName(forTitle: document.name) ?? "Untitled"
+		let name = SheetCache.unusedName(like: "\(stem).\(Self.fileExtension)", in: chosen)
+		let destination = chosen.appendingPathComponent(name)
+
+		guard SheetCache.writeBack(text, to: destination) else { return nil }
+		return destination
 	}
 
 	// MARK: - Saving

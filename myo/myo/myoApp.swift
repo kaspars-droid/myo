@@ -205,6 +205,23 @@ final class PhoneStore: ObservableObject {
 		load(name)
 	}
 
+	/// Moves the sheets that have no home into the folder being given one.
+	///
+	/// The local copy is kept and keeps its name, so nothing has to be fetched
+	/// straight back down. A sheet whose name is already taken up there is
+	/// renamed on both sides rather than written over the top of one somebody
+	/// else's device put there.
+	private func rehome(into picked: URL) {
+		for name in cache.names() {
+			guard let text = cache.read(name) else { continue }
+
+			let wanted = SheetCache.unusedName(like: name, in: picked)
+			if wanted != name, !cache.rename(name, to: wanted, source: nil) { continue }
+
+			_ = SheetCache.writeBack(text, to: picked.appendingPathComponent(wanted))
+		}
+	}
+
 	/// The folder is reached again through a bookmark. A plain path would not
 	/// do: permission to read someone else's folder does not survive a relaunch.
 	private func restoreFolder() -> Bool {
@@ -227,11 +244,20 @@ final class PhoneStore: ObservableObject {
 
 		guard picked.startAccessingSecurityScopedResource() else { return }
 
-		// The list is the folder, so the previous folder's sheets go. Anything
-		// made before a folder was chosen goes with them: it was scratch, and
-		// keeping it would leave sheets in the list that are nowhere in the
-		// folder you just picked.
-		cache.empty()
+		// The list is the folder, so the previous folder's copies go: they are
+		// that folder's sheets, and keeping them would list sheets that are
+		// nowhere in the one just picked.
+		//
+		// Sheets written before any folder was chosen are not copies of
+		// anything. They are the only version there is, and they used to be
+		// deleted here along with the rest — a week of use thrown away by
+		// choosing a folder, silently, with nothing anywhere to get it back
+		// from. Those move into the folder being chosen instead.
+		if folder == nil {
+			rehome(into: picked)
+		} else {
+			cache.empty()
+		}
 		try? cache.makeFolder()
 
 		folder = picked

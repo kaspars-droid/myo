@@ -294,6 +294,28 @@ public struct SheetCache: Sendable {
 		return candidate
 	}
 
+	/// The same question asked of a folder that is not the cache: what can this
+	/// sheet be called in there without landing on top of one already in it.
+	///
+	/// A sheet moving into a folder it did not come from is the case for this.
+	/// Two sheets called `Untitled` is a nuisance; one quietly replacing the
+	/// other is a loss.
+	public static func unusedName(like name: String, in folder: URL) -> String {
+		let manager = FileManager.default
+		let stem = (name as NSString).deletingPathExtension
+		let extended = (name as NSString).pathExtension
+
+		var candidate = name
+		var counter = 2
+
+		while manager.fileExists(atPath: folder.appendingPathComponent(candidate).path) {
+			candidate = "\(stem) \(counter).\(extended)"
+			counter += 1
+		}
+
+		return candidate
+	}
+
 	public func remove(_ name: String, source: URL?) {
 		try? manager.removeItem(at: url(for: name))
 		if let source {
