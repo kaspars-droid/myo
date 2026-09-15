@@ -2,8 +2,24 @@ import SwiftUI
 import AppKit
 import ReckonCore
 
+/// What a sheet was called when it was last read, and when it was last
+/// written. Kept at file scope so that looking at the folder, which happens
+/// off the main thread, is not reaching into a type that belongs to it.
+private struct Named: Sendable {
+	var modified: Date
+	var name: String
+}
+
+/// Everything one look at the folder found, gathered up so it can be carried
+/// back from the thread that did the waiting.
+private struct Look: Sendable {
+	var entries: [SheetEntry]
+	var names: [URL: Named]
+	var openText: String?
+}
+
 /// One sheet in the switcher.
-struct SheetEntry: Identifiable, Equatable {
+struct SheetEntry: Identifiable, Equatable, Sendable {
 	let url: URL
 	/// The sheet's first line, which is what it is called.
 	let name: String
@@ -40,6 +56,18 @@ final class SheetStore: ObservableObject {
 	private var titleOnDisk = ""
 	private var saveWork: Task<Void, Never>?
 	private var renameWork: Task<Void, Never>?
+	private var lookWork: Task<Void, Never>?
+
+	/// What each sheet was called when it was last read, and when it was last
+	/// written.
+	///
+	/// A sheet is named by its first line, so the list cannot be built without
+	/// opening every file in the folder. That is nothing on a local disk and a
+	/// great deal on a sleeping one: these sheets are usually in iCloud Drive,
+	/// and the first read after the machine wakes waits on a provider that has
+	/// to reconnect before it will answer. Remembered here, a sheet nothing
+	/// has touched is never opened again.
+	private var names: [URL: Named] = [:]
 	private let watcher = FolderWatcher()
 	private let access = FolderAccess()
 
@@ -47,7 +75,7 @@ final class SheetStore: ObservableObject {
 	/// Sheets are `.myocalc` files. Nothing else is listed. The engine already
 	/// says which extension that is, and two answers to one question is one
 	/// too many.
-	static var fileExtension: String { SheetCache.fileExtension }
+	nonisolated static var fileExtension: String { SheetCache.fileExtension }
 
 	init() {
 		watcher.onChange = { [weak self] in self?.reloadFromDisk() }
@@ -67,21 +95,32 @@ final class SheetStore: ObservableObject {
 		// Before the remembered sheet is looked for, because sandboxed the
 		// folder is what makes the sheet inside it readable at all.
 		folder = access.restore()
-		refreshEntries()
 
+		// Whatever was open last time opens straight away, without waiting to
+		// hear what else the folder has in it.
 		let remembered = UserDefaults.standard.string(forKey: Self.lastSheetKey)
-
 		if let remembered, FileManager.default.fileExists(atPath: remembered) {
 			load(URL(fileURLWithPath: remembered))
-		} else if let first = entries.first {
-			load(first.url)
-		} else if folder == nil, let held = heldText() {
+			return
+		}
+
+		if folder == nil, let held = heldText() {
 			// Typed before a folder was chosen, and still homeless. It stays a
 			// sheet with no file behind it, so choosing a folder still moves it
 			// into that folder rather than leaving a copy in here.
 			document = SheetDocument(text: held)
 		} else {
 			document = SheetDocument(text: SheetStore.welcome)
+		}
+
+		// The folder is asked afterwards, and its first sheet opens over the
+		// welcome when it answers. That is what used to happen anyway; it just
+		// happened before there was anything on screen.
+		lookWork?.cancel()
+		lookWork = Task { [weak self] in
+			await self?.lookAgain()
+			guard let self, self.url == nil, let first = self.entries.first else { return }
+			self.load(first.url)
 		}
 	}
 
@@ -163,8 +202,9 @@ final class SheetStore: ObservableObject {
 		guard (try? FileManager.default.trashItem(at: target, resultingItemURL: &trashed)) != nil
 		else { return }
 
-		refreshEntries()
-		guard url == target else { return }
+		names[target] = nil
+
+		guard url == target else { return refreshEntries() }
 
 		// The sheet on screen has just gone. Cleared before anything else, so
 		// the save that follows has no file left to write it back to.
@@ -174,7 +214,15 @@ final class SheetStore: ObservableObject {
 		document = SheetDocument(text: "")
 		UserDefaults.standard.removeObject(forKey: Self.lastSheetKey)
 
-		if let first = entries.first { load(first.url) } else { newSheet() }
+		// Which sheet to open instead is a question about the folder, so it
+		// waits for the folder to answer rather than holding the app still.
+		lookWork?.cancel()
+		lookWork = Task { [weak self] in
+			await self?.lookAgain()
+			guard let self, self.url == nil else { return }
+
+			if let first = self.entries.first { self.load(first.url) } else { self.newSheet() }
+		}
 	}
 
 	func load(_ target: URL) {
@@ -242,13 +290,23 @@ final class SheetStore: ObservableObject {
 		let rehomed = rehome(into: chosen)
 		// Whatever was being held has a folder now, or was never worth holding.
 		dropHolding()
-		refreshEntries()
+		// A different folder's names say nothing about this one.
+		names.removeAll()
 		watcher.watch(folder: folder, file: url)
 
 		if let rehomed {
+			refreshEntries()
 			load(rehomed)
-		} else if openFirst, let first = entries.first, first.url != url {
-			load(first.url)
+			return
+		}
+
+		lookWork?.cancel()
+		lookWork = Task { [weak self] in
+			await self?.lookAgain()
+			guard let self, openFirst, let first = self.entries.first, first.url != self.url
+			else { return }
+
+			self.load(first.url)
 		}
 	}
 
@@ -357,14 +415,50 @@ final class SheetStore: ObservableObject {
 	/// one read on Tuesday.
 	func reloadFromDisk() {
 		// Our own unsaved edit goes back first, so re-reading cannot lose it.
+		// It writes only when there is something to write, so opening the panel
+		// on a sheet nobody has touched does not go near the disk here.
 		saveNow()
 		refreshEntries()
 		watcher.watch(folder: folder, file: url)
+	}
 
-		guard let url,
-			  let text = try? String(contentsOf: url, encoding: .utf8),
-			  text != contentsOnDisk
-		else { return }
+	/// Re-reads the folder, without making anyone wait for it.
+	///
+	/// It used to be read on the spot, which meant the panel could not be drawn
+	/// until every sheet in an iCloud folder had been opened. Awake that is a
+	/// few milliseconds and nobody ever saw it; after the machine has slept,
+	/// the provider has to reconnect before it answers a single question, and
+	/// the app sat there with nothing on screen looking like it had died.
+	func refreshEntries() {
+		lookWork?.cancel()
+		lookWork = Task { [weak self] in await self?.lookAgain() }
+	}
+
+	/// The waiting part, kept off the thread that draws.
+	private func lookAgain() async {
+		let folder = self.folder
+		let open = self.url
+		let known = self.names
+
+		let found = await Task.detached(priority: .utility) {
+			SheetStore.look(in: folder, at: open, naming: known)
+		}.value
+
+		guard !Task.isCancelled else { return }
+
+		names = found.names
+		entries = found.entries
+		adopt(found.openText, read: open)
+	}
+
+	/// Takes on what the folder handed back for the sheet on screen.
+	private func adopt(_ text: String?, read: URL?) {
+		guard let text, let url, url == read, text != contentsOnDisk else { return }
+
+		// Only when there is nothing unsaved. Reading the folder takes long
+		// enough now for a sentence to be typed while it happens, and the
+		// answer arriving must not take that sentence away.
+		guard document.fileContents == contentsOnDisk else { return }
 
 		contentsOnDisk = text
 		document = SheetDocument(text: text)
@@ -373,11 +467,13 @@ final class SheetStore: ObservableObject {
 		titleOnDisk = document.name
 	}
 
-	func refreshEntries() {
-		guard let folder else {
-			entries = []
-			return
-		}
+	/// Everything that has to touch the disk, in one place, so that one place
+	/// can be somewhere other than the main thread.
+	private nonisolated static func look(in folder: URL?, at open: URL?,
+										 naming known: [URL: Named]) -> Look {
+		let openText = open.flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+
+		guard let folder else { return Look(entries: [], names: [:], openText: openText) }
 
 		let contents = (try? FileManager.default.contentsOfDirectory(
 			at: folder, includingPropertiesForKeys: [.contentModificationDateKey],
@@ -386,23 +482,40 @@ final class SheetStore: ObservableObject {
 
 		let sheets = contents.filter { $0.pathExtension.lowercased() == Self.fileExtension }
 
+		var entries: [SheetEntry] = []
+		var names: [URL: Named] = [:]
+
 		// Ordered before the names are worked out, so the list is not
 		// reshuffled by what happens to be on a sheet's first line.
-		entries = SheetOrder.lastEditedFirst(sheets)
-			.map { file in
-				// A sheet is called by its first line, not its file name.
-				let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
-				let stem = file.deletingPathExtension().lastPathComponent
+		for file in SheetOrder.lastEditedFirst(sheets) {
+			let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey])
+				.contentModificationDate) ?? .distantPast
 
-				// An empty sheet has no first line to be named by, so it falls
-				// back to its file name. Saying so stops it reading as a
-				// different sheet that appeared from nowhere.
-				let named = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-					? stem
-					: SheetDocument(text: text).name
-
-				return SheetEntry(url: file, name: named)
+			// A sheet nothing has written to since it was last read keeps the
+			// name it was given then. Asking the date is one question; opening
+			// the file is a download.
+			if let remembered = known[file], remembered.modified == modified {
+				entries.append(SheetEntry(url: file, name: remembered.name))
+				names[file] = remembered
+				continue
 			}
+
+			// A sheet is called by its first line, not its file name.
+			let text = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+			let stem = file.deletingPathExtension().lastPathComponent
+
+			// An empty sheet has no first line to be named by, so it falls
+			// back to its file name. Saying so stops it reading as a
+			// different sheet that appeared from nowhere.
+			let named = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+				? stem
+				: SheetDocument(text: text).name
+
+			entries.append(SheetEntry(url: file, name: named))
+			names[file] = Named(modified: modified, name: named)
+		}
+
+		return Look(entries: entries, names: names, openText: openText)
 	}
 
 	/// A new sheet is a new file beside the current one, opened in this same
