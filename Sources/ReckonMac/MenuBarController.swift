@@ -88,11 +88,16 @@ final class MenuBarController: NSObject, NSApplicationDelegate {
 		if popover.isShown {
 			popover.performClose(nil)
 		} else {
-			// Opening the panel is this app's equivalent of opening the app.
-			SheetStore.shared.reloadFromDisk()
+			// Shown first, and asked about the folder afterwards. Opening the
+			// panel is this app's equivalent of opening the app, and it used to
+			// wait on the folder before drawing anything — which on a Mac that
+			// has been asleep, with the sheets in iCloud, is seconds of blank
+			// screen while the provider wakes up.
 			popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
 			popover.contentViewController?.view.window?.makeKey()
 			watchForClicksElsewhere()
+
+			SheetStore.shared.reloadFromDisk()
 		}
 	}
 
