@@ -163,6 +163,7 @@ private final class SheetRow: NSView {
 	private static let height: CGFloat = 22
 	private static let inset: CGFloat = 12
 	private static let buttonWidth: CGFloat = 26
+	private static let glyph: CGFloat = 16
 	private static var font: NSFont { .menuFont(ofSize: 13) }
 
 	static func width(fitting names: [String]) -> CGFloat {
@@ -181,22 +182,52 @@ private final class SheetRow: NSView {
 		label.stringValue = (isCurrent ? "✓  " : "     ") + entry.name
 		label.font = Self.font
 		label.lineBreakMode = .byTruncatingMiddle
-		label.frame = NSRect(x: Self.inset, y: 3,
-							 width: width - Self.inset - Self.buttonWidth, height: 16)
 		addSubview(label)
 
 		button.isBordered = false
 		button.bezelStyle = .regularSquare
 		button.imagePosition = .imageOnly
-		button.frame = NSRect(x: width - Self.buttonWidth, y: 3, width: 18, height: 16)
 		button.target = self
 		button.action = #selector(press)
 		addSubview(button)
 
+		place()
 		dress()
 	}
 
 	required init?(coder: NSCoder) { fatalError("not from a nib") }
+
+	// MARK: - Laying out
+
+	override func layout() {
+		super.layout()
+		place()
+	}
+
+	override func setFrameSize(_ newSize: NSSize) {
+		super.setFrameSize(newSize)
+		place()
+	}
+
+	/// Puts the label and the X where the row's own width says they go.
+	///
+	/// A menu decides how wide its rows are. It takes the widest thing in it,
+	/// stock items included, hands every view that width, and on some versions
+	/// indents it to leave the column a checkmark would use. So the width a
+	/// row is made with is a guess, and it was being treated as the answer:
+	/// positions worked out once at `init` are right only where the guess
+	/// happened to match. Where it did not, the X was placed outside the part
+	/// of the row that gets drawn, and never appeared at all.
+	private func place() {
+		let middle = (bounds.height - Self.glyph) / 2
+
+		label.frame = NSRect(x: Self.inset, y: middle,
+							 width: max(bounds.width - Self.inset - Self.buttonWidth, 0),
+							 height: Self.glyph)
+
+		button.frame = NSRect(x: max(bounds.width - Self.buttonWidth, 0), y: middle,
+							  width: Self.glyph + 2, height: Self.glyph)
+	}
 
 	// MARK: - The two presses
 
