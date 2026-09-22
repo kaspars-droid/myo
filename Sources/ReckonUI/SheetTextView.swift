@@ -516,10 +516,33 @@ final class SheetEditorView: UIView {
 	let results = ResultsView()
 
 	var sheet = Sheet()
-	var columnWidth: CGFloat = 132 { didSet { setNeedsLayout() } }
+
+	/// How wide the results are, which is also how narrow the sheet is: the
+	/// two share the width between them.
+	///
+	/// So a result growing a digit takes a character's width away from every
+	/// line, and a line that was just fitting wraps. Mid sentence that reads
+	/// as the page moving under you, because it is: the sheet gets a line
+	/// taller and everything below the wrap slides down.
+	var columnWidth: CGFloat = 132 {
+		didSet {
+			guard columnWidth != oldValue else { return }
+
+			// Noted before the relayout, while the old one is still true.
+			pinnedCaret = typing ? caretOnScreen() : nil
+			setNeedsLayout()
+		}
+	}
+
 	private let gap: CGFloat = 12
 	/// A caret to bring into sight once this view is on screen.
 	private var caretIsWaiting = false
+
+	/// Where the caret was on screen when the width last changed, so it can be
+	/// put back there once the sheet has been laid out again.
+	private var pinnedCaret: CGFloat?
+
+	private var typing: Bool { textView.isFirstResponder }
 
 	override init(frame: CGRect) {
 		super.init(frame: frame)
@@ -585,9 +608,7 @@ final class SheetEditorView: UIView {
 
 		window.layoutIfNeeded()
 
-		var view: UIView? = superview
-		while let next = view, !(next is UIScrollView) { view = next.superview }
-		guard let scroll = view as? UIScrollView, let caret = caretRect() else { return }
+		guard let scroll = enclosingScroll(), let caret = caretRect() else { return }
 
 		// A line of air, so the caret is never flush against the bar.
 		scroll.scrollRectToVisible(
@@ -629,6 +650,46 @@ final class SheetEditorView: UIView {
 			caretIsWaiting = false
 			revealCaret()      // after this layout, not during it
 		}
+
+		if let pinnedCaret {
+			self.pinnedCaret = nil
+			// After this layout rather than during it: the height this view
+			// has just asked for has not reached the scroll view yet.
+			DispatchQueue.main.async { [weak self] in self?.keepCaret(at: pinnedCaret) }
+		}
+	}
+
+	// MARK: - Holding the caret still
+
+	/// How far down the screen the caret is, or nil when it cannot be said.
+	private func caretOnScreen() -> CGFloat? {
+		guard let scroll = enclosingScroll(), let caret = caretRect() else { return nil }
+		return scroll.convert(caret, from: self).minY - scroll.contentOffset.y
+	}
+
+	/// Puts the line being typed back where it was before the sheet re-wrapped.
+	///
+	/// A scroll view keeps its offset when its content changes height, which is
+	/// right for a list and wrong for a sheet somebody is typing into: a line
+	/// wrapping above the caret pushes the caret down, far enough and it goes
+	/// behind the keyboard, and then `revealCaret` hauls the page after it.
+	/// Holding the caret at the height it was already at leaves the reflow
+	/// where it belongs — in the sheet, rather than under the hands.
+	private func keepCaret(at wasAt: CGFloat) {
+		guard let scroll = enclosingScroll(), let caret = caretRect() else { return }
+
+		let now = scroll.convert(caret, from: self).minY
+		let top = -scroll.adjustedContentInset.top
+		let bottom = max(scroll.contentSize.height + scroll.adjustedContentInset.bottom
+						 - scroll.bounds.height, top)
+
+		scroll.contentOffset.y = min(max(now - wasAt, top), bottom)
+	}
+
+	private func enclosingScroll() -> UIScrollView? {
+		var view: UIView? = superview
+		while let next = view, !(next is UIScrollView) { view = next.superview }
+		return view as? UIScrollView
 	}
 }
 
