@@ -164,13 +164,31 @@ private final class SheetRow: NSView {
 	private static let inset: CGFloat = 12
 	private static let buttonWidth: CGFloat = 26
 	private static let glyph: CGFloat = 16
+	/// Between the end of the longest name and the X.
+	private static let gap: CGFloat = 16
 	private static var font: NSFont { .menuFont(ofSize: 13) }
 
+	/// The narrowest width that fits a name and the X after it.
+	///
+	/// Narrow on purpose. A menu is as wide as the widest thing in it and
+	/// clips anything wider than that — and a row that asked for more than the
+	/// menu was willing to give had its X drawn past the edge, which is how it
+	/// came to be missing on macOS 15 and present on 26. Asking for less than
+	/// the stock items below need leaves the menu's width to them, and puts
+	/// the X inside it either way: if the row is stretched to the menu's width
+	/// the X follows the real edge, and if it is left alone the X sits at the
+	/// row's own edge, which is somewhere the menu is still drawing.
+	///
+	/// This used to add 130 points to the longest name, which was never a
+	/// measurement of anything.
 	static func width(fitting names: [String]) -> CGFloat {
 		let widest = names
 			.map { ($0 as NSString).size(withAttributes: [.font: font]).width }
 			.max() ?? 0
-		return min(max(widest + 130, 200), 420)
+
+		// What the row actually needs: the name, the gap after it, the X, and
+		// the margin either side.
+		return min(max(widest + inset * 2 + gap + glyph, 180), 340)
 	}
 
 	init(entry: SheetEntry, isCurrent: Bool, width: CGFloat, store: SheetStore) {
@@ -178,6 +196,10 @@ private final class SheetRow: NSView {
 		self.name = entry.name
 		self.store = store
 		super.init(frame: NSRect(x: 0, y: 0, width: width, height: Self.height))
+
+		// If the menu does decide to stretch the row to its own width, the X
+		// goes with it: resizing calls `setFrameSize`, which lays out again.
+		autoresizingMask = [.width]
 
 		label.stringValue = (isCurrent ? "✓  " : "     ") + entry.name
 		label.font = Self.font
