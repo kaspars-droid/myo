@@ -530,6 +530,7 @@ final class SheetEditorView: UIView {
 
 			// Noted before the relayout, while the old one is still true.
 			pinnedCaret = typing ? caretOnScreen() : nil
+			reflowing = pinnedCaret != nil
 			setNeedsLayout()
 		}
 	}
@@ -541,6 +542,13 @@ final class SheetEditorView: UIView {
 	/// Where the caret was on screen when the width last changed, so it can be
 	/// put back there once the sheet has been laid out again.
 	private var pinnedCaret: CGFloat?
+
+	/// Whether the sheet is between one width and the next.
+	///
+	/// While it is, the caret is being held where it already was, and asking
+	/// separately for it to be revealed would scroll as well — twice, a frame
+	/// apart, which is seen as a flash.
+	private var reflowing = false
 
 	private var typing: Bool { textView.isFirstResponder }
 
@@ -599,6 +607,10 @@ final class SheetEditorView: UIView {
 	}
 
 	private func showCaret() {
+		// Not while the sheet is being re-wrapped: the caret is not lost, it
+		// is being held, and two scrolls in two frames is a flash.
+		guard !reflowing else { return }
+
 		// A sheet opened before its view is on screen has nothing to scroll
 		// yet, so the ask is kept until there is.
 		guard let window else {
@@ -653,9 +665,20 @@ final class SheetEditorView: UIView {
 
 		if let pinnedCaret {
 			self.pinnedCaret = nil
-			// After this layout rather than during it: the height this view
-			// has just asked for has not reached the scroll view yet.
-			DispatchQueue.main.async { [weak self] in self?.keepCaret(at: pinnedCaret) }
+
+			// Now, while this layout pass is still running, so that the frame
+			// the sheet is next drawn in is already the corrected one. Putting
+			// it off by even one turn shows the sheet at its new height with
+			// the old offset first, and that is the flash.
+			keepCaret(at: pinnedCaret)
+
+			// And again afterwards, because the height this view has just
+			// asked for may not have reached the scroll view in time for the
+			// first attempt. It writes nothing if the first one took.
+			DispatchQueue.main.async { [weak self] in
+				self?.keepCaret(at: pinnedCaret)
+				self?.reflowing = false
+			}
 		}
 	}
 
@@ -682,8 +705,14 @@ final class SheetEditorView: UIView {
 		let top = -scroll.adjustedContentInset.top
 		let bottom = max(scroll.contentSize.height + scroll.adjustedContentInset.bottom
 						 - scroll.bounds.height, top)
+		let wanted = min(max(now - wasAt, top), bottom)
 
-		scroll.contentOffset.y = min(max(now - wasAt, top), bottom)
+		// Nothing to put back. Writing the offset anyway is a scroll the sheet
+		// did not need, and at the end of a sheet — where the room to scroll
+		// is whatever was just added — it is a visible one.
+		guard abs(wanted - scroll.contentOffset.y) > 0.5 else { return }
+
+		scroll.contentOffset.y = wanted
 	}
 
 	private func enclosingScroll() -> UIScrollView? {
